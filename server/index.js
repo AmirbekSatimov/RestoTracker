@@ -272,7 +272,19 @@ app.post('/api/ingest', async (req, res) => {
       marker,
     });
   } catch (error) {
-    res.status(500).json({ error: 'yt-dlp failed to download the video.' });
+    const details =
+      typeof error?.stderr === 'string'
+        ? error.stderr
+        : typeof error?.stdout === 'string'
+          ? error.stdout
+          : typeof error?.message === 'string'
+            ? error.message
+            : '';
+    console.error('yt-dlp/ffmpeg/whisper failed:', details || error);
+    res.status(500).json({
+      error: 'yt-dlp failed to download the video.',
+      details: details || null,
+    });
   }
 });
 
