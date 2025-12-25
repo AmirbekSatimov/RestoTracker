@@ -45,6 +45,17 @@ async function saveMarkers(markers) {
   await fs.writeFile(markersFile, `${JSON.stringify(markers, null, 2)}\n`);
 }
 
+function createMarker(latitude, longitude, name = '', address = '') {
+  return {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    latitude,
+    longitude,
+    name,
+    address,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 function extractJson(text) {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
@@ -89,6 +100,42 @@ ${transcript}`;
   return parsed;
 }
 
+async function geocodePlace(extracted) {
+  if (!apiKey) {
+    return null;
+  }
+  const placeName = typeof extracted?.placeName === 'string' ? extracted.placeName.trim() : '';
+  const address = typeof extracted?.address === 'string' ? extracted.address.trim() : '';
+  const city = typeof extracted?.city === 'string' ? extracted.city.trim() : '';
+  if (!placeName && !address) {
+    return null;
+  }
+
+  const query = address || [placeName, city].filter(Boolean).join(', ');
+  const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
+  url.searchParams.set('query', query);
+  url.searchParams.set('key', apiKey);
+
+  const response = await fetch(url.toString());
+  const data = await response.json();
+  if (data.status !== 'OK' || !data.results?.length) {
+    return null;
+  }
+
+  const top = data.results[0];
+  const location = top.geometry?.location;
+  if (!location) {
+    return null;
+  }
+
+  return {
+    latitude: location.lat,
+    longitude: location.lng,
+    name: top.name || placeName,
+    address: top.formatted_address || address,
+  };
+}
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
@@ -115,13 +162,11 @@ app.post('/api/markers', async (req, res) => {
 
   try {
     const markers = await loadMarkers();
-    const marker = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    const marker = createMarker(
       latitude,
       longitude,
-      name: typeof name === 'string' ? name : '',
-      createdAt: new Date().toISOString(),
-    };
+      typeof name === 'string' ? name : ''
+    );
     markers.push(marker);
     await saveMarkers(markers);
     res.status(201).json({ marker });
@@ -190,6 +235,7 @@ app.post('/api/ingest', async (req, res) => {
     ]);
     const transcript = transcriptStdout.trim();
     let extracted = null;
+    let marker = null;
     if (transcript) {
       try {
         extracted = await extractPlaceInfo(transcript);
@@ -198,7 +244,33 @@ app.post('/api/ingest', async (req, res) => {
       }
     }
 
-    res.status(202).json({ ok: true, file: filename, audio: wavFile, transcript, extracted });
+    if (extracted) {
+      try {
+        const geocoded = await geocodePlace(extracted);
+        if (geocoded) {
+          const markers = await loadMarkers();
+          marker = createMarker(
+            geocoded.latitude,
+            geocoded.longitude,
+            geocoded.name,
+            geocoded.address
+          );
+          markers.push(marker);
+          await saveMarkers(markers);
+        }
+      } catch (error) {
+        marker = null;
+      }
+    }
+
+    res.status(202).json({
+      ok: true,
+      file: filename,
+      audio: wavFile,
+      transcript,
+      extracted,
+      marker,
+    });
   } catch (error) {
     res.status(500).json({ error: 'yt-dlp failed to download the video.' });
   }

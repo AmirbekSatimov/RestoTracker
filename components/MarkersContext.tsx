@@ -10,6 +10,7 @@ type MapMarker = {
 type MarkersContextValue = {
   markers: MapMarker[];
   addMarker: (latitude: number, longitude: number, name?: string) => void;
+  refreshMarkers: () => void;
 };
 
 const MarkersContext = createContext<MarkersContextValue | null>(null);
@@ -24,7 +25,7 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
     return base.replace(/\/$/, '');
   }, []);
 
-  useEffect(() => {
+  const fetchMarkers = () => {
     if (!apiBase) {
       return;
     }
@@ -36,6 +37,10 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchMarkers();
   }, [apiBase]);
 
   const addMarker = async (latitude: number, longitude: number, name?: string) => {
@@ -78,7 +83,10 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
     ]);
   };
 
-  const value = useMemo(() => ({ markers, addMarker }), [markers]);
+  const value = useMemo(
+    () => ({ markers, addMarker, refreshMarkers: fetchMarkers }),
+    [markers]
+  );
 
   return <MarkersContext.Provider value={value}>{children}</MarkersContext.Provider>;
 }

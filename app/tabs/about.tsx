@@ -10,7 +10,7 @@ export default function AboutScreen() {
   const [suggestions, setSuggestions] = useState<Array<{ name: string; placeId: string }>>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [sessionToken, setSessionToken] = useState('');
-  const { addMarker } = useMarkers();
+  const { addMarker, refreshMarkers } = useMarkers();
 
   const proxyBase = useMemo(() => process.env.EXPO_PUBLIC_PLACES_PROXY_URL?.trim() ?? '', []);
 
@@ -169,7 +169,19 @@ export default function AboutScreen() {
         Alert.alert('Submit failed', data?.error || 'Unable to submit the link.');
         return;
       }
-      Alert.alert('Link submitted', 'We received the link and will process it.');
+      if (data?.marker?.latitude && data?.marker?.longitude) {
+        refreshMarkers();
+        router.push({
+          pathname: '/tabs',
+          params: {
+            lat: data.marker.latitude.toString(),
+            lng: data.marker.longitude.toString(),
+          },
+        });
+        Alert.alert('Location added', 'We added a location from the link.');
+      } else {
+        Alert.alert('Link submitted', 'We received the link and will process it.');
+      }
       setLinkUrl('');
     } catch (error) {
       Alert.alert('Submit failed', 'Unable to reach the server.');
