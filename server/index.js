@@ -19,6 +19,8 @@ const whisperModel = process.env.WHISPER_MODEL || 'base';
 const whisperDevice = process.env.WHISPER_DEVICE || 'cpu';
 const whisperComputeType = process.env.WHISPER_COMPUTE_TYPE || 'int8';
 const ytDlpCookies = process.env.YTDLP_COOKIES || '';
+const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+const ollamaModel = process.env.OLLAMA_MODEL || 'qwen2.5';
 const dataDir = path.join(process.cwd(), 'data');
 const markersFile = path.join(dataDir, 'markers.json');
 const execFileAsync = promisify(execFile);
@@ -41,6 +43,50 @@ async function loadMarkers() {
 async function saveMarkers(markers) {
   await fs.mkdir(dataDir, { recursive: true });
   await fs.writeFile(markersFile, `${JSON.stringify(markers, null, 2)}\n`);
+}
+
+function extractJson(text) {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch (error) {
+    return null;
+  }
+}
+
+async function extractPlaceInfo(transcript) {
+  const prompt = `You extract restaurant location info from transcripts.
+Return ONLY valid JSON with keys:
+placeName (string), address (string), city (string), clues (string), confidence (number 0-1).
+If unknown, use empty strings and low confidence.
+
+Transcript:
+${transcript}`;
+
+  const response = await fetch(`${ollamaUrl}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: ollamaModel,
+      prompt,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Ollama request failed.');
+  }
+
+  const data = await response.json();
+  const parsed = extractJson(data?.response ?? '');
+  if (!parsed) {
+    throw new Error('Failed to parse Ollama response.');
+  }
+  return parsed;
 }
 
 app.get('/api/health', (req, res) => {
@@ -143,8 +189,16 @@ app.post('/api/ingest', async (req, res) => {
       whisperComputeType,
     ]);
     const transcript = transcriptStdout.trim();
+    let extracted = null;
+    if (transcript) {
+      try {
+        extracted = await extractPlaceInfo(transcript);
+      } catch (error) {
+        extracted = null;
+      }
+    }
 
-    res.status(202).json({ ok: true, file: filename, audio: wavFile, transcript });
+    res.status(202).json({ ok: true, file: filename, audio: wavFile, transcript, extracted });
   } catch (error) {
     res.status(500).json({ error: 'yt-dlp failed to download the video.' });
   }
