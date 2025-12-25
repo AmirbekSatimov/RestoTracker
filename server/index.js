@@ -197,9 +197,10 @@ app.post('/api/ingest', async (req, res) => {
     const outputTemplate = path.join(os.tmpdir(), 'resto-%(id)s.%(ext)s');
     const args = [
       '--no-playlist',
+      '--no-simulate',
       ...(ytDlpCookies ? ['--cookies', ytDlpCookies] : []),
       '--print',
-      'filename',
+      'after_move:filepath',
       '-o',
       outputTemplate,
       trimmedUrl,
