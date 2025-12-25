@@ -2,15 +2,25 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 dotenv.config();
 
 const app = express();
 const port = Number.parseInt(process.env.PORT ?? '5050', 10);
 const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+const ytDlpPath = process.env.YTDLP_PATH || 'yt-dlp';
+const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
+const pythonPath = process.env.PYTHON_PATH || 'python3';
+const whisperModel = process.env.WHISPER_MODEL || 'base';
+const whisperDevice = process.env.WHISPER_DEVICE || 'cpu';
+const whisperComputeType = process.env.WHISPER_COMPUTE_TYPE || 'int8';
 const dataDir = path.join(process.cwd(), 'data');
 const markersFile = path.join(dataDir, 'markers.json');
+const execFileAsync = promisify(execFile);
 
 app.use(cors());
 app.use(express.json());
@@ -79,7 +89,62 @@ app.post('/api/ingest', async (req, res) => {
     res.status(400).json({ error: 'Missing url.' });
     return;
   }
-  res.status(202).json({ ok: true });
+  const trimmedUrl = url.trim();
+  try {
+    const parsed = new URL(trimmedUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      res.status(400).json({ error: 'Invalid url protocol.' });
+      return;
+    }
+  } catch (error) {
+    res.status(400).json({ error: 'Invalid url.' });
+    return;
+  }
+
+  try {
+    const outputTemplate = path.join(os.tmpdir(), 'resto-%(id)s.%(ext)s');
+    const { stdout } = await execFileAsync(ytDlpPath, [
+      '--no-playlist',
+      '--print',
+      'filename',
+      '-o',
+      outputTemplate,
+      trimmedUrl,
+    ]);
+    const filename = stdout.split('\n').map((line) => line.trim()).find(Boolean);
+    if (!filename) {
+      res.status(500).json({ error: 'Download failed.' });
+      return;
+    }
+    const wavFile = filename.replace(path.extname(filename), '.wav');
+    await execFileAsync(ffmpegPath, [
+      '-y',
+      '-i',
+      filename,
+      '-ar',
+      '16000',
+      '-ac',
+      '1',
+      wavFile,
+    ]);
+
+    const scriptPath = path.join(process.cwd(), 'scripts', 'transcribe.py');
+    const { stdout: transcriptStdout } = await execFileAsync(pythonPath, [
+      scriptPath,
+      wavFile,
+      '--model',
+      whisperModel,
+      '--device',
+      whisperDevice,
+      '--compute-type',
+      whisperComputeType,
+    ]);
+    const transcript = transcriptStdout.trim();
+
+    res.status(202).json({ ok: true, file: filename, audio: wavFile, transcript });
+  } catch (error) {
+    res.status(500).json({ error: 'yt-dlp failed to download the video.' });
+  }
 });
 
 app.get('/api/places', async (req, res) => {
