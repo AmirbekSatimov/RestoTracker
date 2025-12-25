@@ -18,6 +18,7 @@ const pythonPath = process.env.PYTHON_PATH || 'python3';
 const whisperModel = process.env.WHISPER_MODEL || 'base';
 const whisperDevice = process.env.WHISPER_DEVICE || 'cpu';
 const whisperComputeType = process.env.WHISPER_COMPUTE_TYPE || 'int8';
+const ytDlpCookies = process.env.YTDLP_COOKIES || '';
 const dataDir = path.join(process.cwd(), 'data');
 const markersFile = path.join(dataDir, 'markers.json');
 const execFileAsync = promisify(execFile);
@@ -103,14 +104,16 @@ app.post('/api/ingest', async (req, res) => {
 
   try {
     const outputTemplate = path.join(os.tmpdir(), 'resto-%(id)s.%(ext)s');
-    const { stdout } = await execFileAsync(ytDlpPath, [
+    const args = [
       '--no-playlist',
+      ...(ytDlpCookies ? ['--cookies', ytDlpCookies] : []),
       '--print',
       'filename',
       '-o',
       outputTemplate,
       trimmedUrl,
-    ]);
+    ];
+    const { stdout } = await execFileAsync(ytDlpPath, args);
     const filename = stdout.split('\n').map((line) => line.trim()).find(Boolean);
     if (!filename) {
       res.status(500).json({ error: 'Download failed.' });
