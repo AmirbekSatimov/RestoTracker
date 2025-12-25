@@ -132,6 +132,6 @@ app.get('/api/place-details', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Places proxy listening on http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Places proxy listening on http://0.0.0.0:${port}`);
 });
