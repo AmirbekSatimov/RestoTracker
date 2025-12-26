@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function BubbleTabButton({
@@ -27,6 +27,11 @@ function BubbleTabButton({
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+
+  // Pill width ~ half screen (tweak multiplier if you want)
+  const pillWidth = Math.round(screenWidth * 0.56);
+  const pillLeft = Math.round((screenWidth - pillWidth) / 2);
 
   return (
     <Tabs
@@ -34,12 +39,15 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: false,
 
+        // no accent colors
         tabBarActiveTintColor: 'rgba(255,255,255,0.95)',
         tabBarInactiveTintColor: 'rgba(255,255,255,0.70)',
 
         tabBarStyle: [
           styles.tabBar,
           {
+            width: pillWidth,
+            left: pillLeft, // <-- hard-center the pill
             bottom: Math.max(insets.bottom - 6, 10),
           },
         ],
@@ -89,14 +97,10 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  // Make the whole bar MUCH shorter (half-ish width) and centered
   tabBar: {
     position: 'absolute',
-    alignSelf: 'center',
-    width: '56%', // <-- smaller pill (try 50%–60%)
     height: 62,
     borderRadius: 999,
-
     backgroundColor: 'transparent',
     borderTopWidth: 0,
     overflow: 'hidden',
@@ -131,14 +135,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
 
-  // Each tab takes half of the pill, and centers its contents
+  // Each tab gets half of the pill; icons are centered
   buttonWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // This is the actual "oval" selection bubble (never square)
+  // Oval selection bubble (never square)
   bubble: {
     width: 64,
     height: 44,
