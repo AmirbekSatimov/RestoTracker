@@ -5,6 +5,11 @@ import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const ACCENT = '#5FA8FF';
+const TEXT_PRIMARY = 'rgba(255,255,255,0.92)';
+const TEXT_SECONDARY = 'rgba(255,255,255,0.65)';
+const BORDER = 'rgba(255,255,255,0.16)';
+
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const extraBottom = Math.max(insets.bottom, 10);
@@ -12,20 +17,20 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#ffd33d',
-        tabBarInactiveTintColor: 'rgba(213, 215, 219, 0.9)',
+        tabBarActiveTintColor: ACCENT,
+        tabBarInactiveTintColor: TEXT_SECONDARY,
 
         headerStyle: { backgroundColor: '#25292e' },
         headerShadowVisible: false,
-        headerTintColor: '#fff',
+        headerTintColor: TEXT_PRIMARY,
 
-        // No yellow slab highlight
+        // Remove the ugly yellow slab completely
         tabBarActiveBackgroundColor: 'transparent',
 
         tabBarLabelStyle: styles.label,
         tabBarItemStyle: styles.tabItem,
 
-        // Fill the bottom gap using safe-area inset
+        // Fill the bottom gap and keep it looking native
         tabBarStyle: [
           styles.tabBar,
           {
@@ -42,7 +47,7 @@ export default function TabLayout() {
               tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
               style={[StyleSheet.absoluteFill, styles.blurClip]}
             />
-            {/* iOS-like edge treatment */}
+            {/* Borders stay (as requested) */}
             <View pointerEvents="none" style={styles.border} />
             <View pointerEvents="none" style={styles.topLine} />
           </View>
@@ -109,6 +114,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     marginTop: 2,
+    color: TEXT_SECONDARY,
   },
 
   blurClip: {
@@ -119,7 +125,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: BORDER,
   },
 
   topLine: {
@@ -128,6 +134,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
 });
