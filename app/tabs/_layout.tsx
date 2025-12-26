@@ -8,6 +8,7 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: '#ffd33d',
         tabBarInactiveTintColor: '#d5d7db',
+
         headerStyle: { backgroundColor: '#25292e' },
         headerShadowVisible: false,
         headerTintColor: '#fff',
@@ -16,6 +17,11 @@ export default function TabLayout() {
         tabBarItemStyle: styles.tabItem,
         tabBarActiveBackgroundColor: 'rgba(255, 211, 61, 0.12)',
 
+        // Optional: makes spacing feel more “iOS”
+        tabBarLabelStyle: styles.label,
+        tabBarIconStyle: styles.icon,
+
+        // Apple-glass mimic background (NO expo-blur)
         tabBarBackground: () => (
           <View style={[StyleSheet.absoluteFill, styles.glass]}>
             <View style={styles.sheen} />
@@ -38,6 +44,7 @@ export default function TabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="about"
         options={{
@@ -58,63 +65,82 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    backgroundColor: 'transparent', // important so glass layer shows
-    borderTopWidth: 0,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 20,
-    height: 74,
-    overflow: 'hidden',
-    paddingBottom: 6,
 
-    // “floating glass” feel
+    // This is what makes it float and sit higher
+    left: 16,
+    right: 16,
+    bottom: 26, // <-- increase (30–34) if you want even higher
+
+    // Less chunky than before
+    height: 64,
+    borderRadius: 22,
+
+    // Must be transparent so the glass layer shows
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+    overflow: 'hidden',
+
+    // Shadow for the floating iOS feel
     shadowColor: '#000',
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
   },
 
   tabItem: {
     marginHorizontal: 8,
-    marginVertical: 8,
+    marginVertical: 6,
     borderRadius: 16,
   },
 
-  glass: {
-    borderRadius: 20,
-    backgroundColor: 'rgba(18, 20, 24, 0.78)', // glass tint
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+  label: {
+    fontSize: 12,
+    marginBottom: 2,
   },
 
-  // bright “sheen” on top half
+  icon: {
+    marginTop: 6,
+  },
+
+  // ---- Apple-glass mimic (no blur) ----
+  glass: {
+    borderRadius: 22,
+
+    // lighter + more “material” than your current dark slab
+    backgroundColor: 'rgba(18, 18, 18, 0.38)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+
+  // angled light sheen = way less “cheap overlay”
   sheen: {
+    position: 'absolute',
+    top: -12,
+    left: -20,
+    right: -20,
+    height: '70%',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    transform: [{ rotate: '-6deg' }],
+  },
+
+  // subtle top edge highlight like iOS materials
+  topLine: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: '58%',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-
-  // thin highlight line near the top edge
-  topLine: {
-    position: 'absolute',
-    top: 6,
-    left: '10%',
-    right: '10%',
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.24)',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
   },
 
-  // slight darkening at the bottom for depth
+  // bottom shade to add depth
   bottomShade: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '46%',
-    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+    bottom: -6,
+    left: -10,
+    right: -10,
+    height: '55%',
+    backgroundColor: 'rgba(0, 0, 0, 0.20)',
   },
 });
