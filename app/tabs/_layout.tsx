@@ -8,7 +8,6 @@ import {
   StyleSheet,
   useWindowDimensions,
   View,
-  ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,9 +18,8 @@ function BubbleTabButton(props: any) {
   return (
     <Pressable
       onPress={onPress}
-      // CRITICAL: apply the style passed by the navigator
+      // CRITICAL: apply navigator-provided style so each tab gets proper layout space
       style={[style, styles.buttonWrap]}
-      android_ripple={{ color: 'rgba(255,255,255,0.08)', borderless: true }}
       {...rest}
     >
       <View style={[styles.bubble, selected && styles.bubbleSelected]}>
@@ -35,9 +33,8 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
-  // smaller pill (~half screen)
+  // Make pill shorter (adjust 0.50–0.60 to taste)
   const pillWidth = Math.round(screenWidth * 0.54);
-  const pillLeft = Math.round((screenWidth - pillWidth) / 2);
 
   return (
     <Tabs
@@ -47,19 +44,21 @@ export default function TabLayout() {
 
         // no accent colors
         tabBarActiveTintColor: 'rgba(255,255,255,0.95)',
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.72)',
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.70)',
 
-        // We handle the selected bubble ourselves
+        // we draw our own bubble, so keep this off
         tabBarActiveBackgroundColor: 'transparent',
 
+        // BOTTOM MIDDLE — force horizontal centering
         tabBarStyle: [
           styles.tabBar,
           {
             width: pillWidth,
-            left: pillLeft, // hard center
-            right: undefined, // ensure right doesn't interfere
+            left: 0,
+            right: 0,
+            alignSelf: 'center',
             bottom: Math.max(insets.bottom - 6, 10),
-          } as ViewStyle,
+          },
         ],
 
         tabBarBackground: () => (
@@ -115,7 +114,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     overflow: 'hidden',
 
-    // keep layout tight and centered
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
@@ -148,14 +146,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
 
-  // Each tab gets equal space (this only works if we apply navigator style!)
+  // each tab gets equal space and centers its icon
   buttonWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // True oval selection bubble (never square)
+  // true oval selection bubble (never square)
   bubble: {
     width: 64,
     height: 44,
