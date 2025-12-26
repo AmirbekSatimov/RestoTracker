@@ -5,7 +5,11 @@ import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const ACCENT = '#5FA8FF';
+// Accent options:
+// const ACCENT = '#34D399'; // mint
+const ACCENT = '#2DD4BF'; // teal (recommended)
+// const ACCENT = '#22D3EE'; // icy cyan
+
 const TEXT_PRIMARY = 'rgba(255,255,255,0.92)';
 const TEXT_SECONDARY = 'rgba(255,255,255,0.65)';
 const BORDER = 'rgba(255,255,255,0.16)';
@@ -24,13 +28,12 @@ export default function TabLayout() {
         headerShadowVisible: false,
         headerTintColor: TEXT_PRIMARY,
 
-        // Remove the ugly yellow slab completely
+        // removes yellow slab
         tabBarActiveBackgroundColor: 'transparent',
 
         tabBarLabelStyle: styles.label,
         tabBarItemStyle: styles.tabItem,
 
-        // Fill the bottom gap and keep it looking native
         tabBarStyle: [
           styles.tabBar,
           {
@@ -47,7 +50,6 @@ export default function TabLayout() {
               tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
               style={[StyleSheet.absoluteFill, styles.blurClip]}
             />
-            {/* Borders stay (as requested) */}
             <View pointerEvents="none" style={styles.border} />
             <View pointerEvents="none" style={styles.topLine} />
           </View>
@@ -90,12 +92,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-
     borderRadius: 22,
     backgroundColor: 'transparent',
     borderTopWidth: 0,
     overflow: 'hidden',
-
     paddingTop: 6,
 
     shadowColor: '#000',
