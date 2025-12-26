@@ -45,13 +45,22 @@ async function saveMarkers(markers) {
   await fs.writeFile(markersFile, `${JSON.stringify(markers, null, 2)}\n`);
 }
 
-function createMarker(latitude, longitude, name = '', address = '') {
+function normalizeEmoji(value) {
+  if (typeof value !== 'string') {
+    return '📍';
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : '📍';
+}
+
+function createMarker(latitude, longitude, name = '', address = '', emoji = '📍') {
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     latitude,
     longitude,
     name,
     address,
+    emoji: normalizeEmoji(emoji),
     createdAt: new Date().toISOString(),
   };
 }
@@ -72,8 +81,21 @@ function extractJson(text) {
 async function extractPlaceInfo(transcript) {
   const prompt = `You extract restaurant location info from transcripts.
 Return ONLY valid JSON with keys:
-placeName (string), address (string), city (string), clues (string), confidence (number 0-1).
-If unknown, use empty strings and low confidence.
+placeName (string), address (string), city (string), cuisine (string), clues (string), confidence (number 0-1), emoji (string, single emoji).
+Choose the emoji based on cuisine:
+- pizza -> 🍕
+- burgers -> 🍔
+- sushi/japanese -> 🍣
+- ramen/noodles -> 🍜
+- tacos/mexican -> 🌮
+- bbq/steak -> 🥩
+- coffee/cafe -> ☕
+- bakery/dessert -> 🥐
+- ice cream/dessert -> 🍦
+- tea/boba -> 🧋
+- bar/drinks -> 🍺
+- salad/vegan/vegetarian -> 🥗
+If unknown, use empty strings and low confidence, and emoji 📍.
 
 Transcript:
 ${transcript}`;
@@ -133,6 +155,7 @@ async function geocodePlace(extracted) {
     longitude: location.lng,
     name: top.name || placeName,
     address: top.formatted_address || address,
+    emoji: normalizeEmoji(extracted?.emoji),
   };
 }
 
@@ -165,7 +188,9 @@ app.post('/api/markers', async (req, res) => {
     const marker = createMarker(
       latitude,
       longitude,
-      typeof name === 'string' ? name : ''
+      typeof name === 'string' ? name : '',
+      '',
+      normalizeEmoji(req.body?.emoji)
     );
     markers.push(marker);
     await saveMarkers(markers);

@@ -5,11 +5,13 @@ type MapMarker = {
   latitude: number;
   longitude: number;
   name?: string;
+  address?: string;
+  emoji?: string;
 };
 
 type MarkersContextValue = {
   markers: MapMarker[];
-  addMarker: (latitude: number, longitude: number, name?: string) => void;
+  addMarker: (latitude: number, longitude: number, name?: string, emoji?: string) => void;
   refreshMarkers: () => void;
 };
 
@@ -43,7 +45,12 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
     fetchMarkers();
   }, [apiBase]);
 
-  const addMarker = async (latitude: number, longitude: number, name?: string) => {
+  const addMarker = async (
+    latitude: number,
+    longitude: number,
+    name?: string,
+    emoji?: string
+  ) => {
     if (!apiBase) {
       setMarkers((prev) => [
         ...prev,
@@ -52,6 +59,7 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
           latitude,
           longitude,
           name,
+          emoji,
         },
       ]);
       return;
@@ -61,7 +69,7 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch(`${apiBase}/api/markers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude, longitude, name }),
+        body: JSON.stringify({ latitude, longitude, name, emoji }),
       });
       const data = await response.json();
       if (data?.marker) {
