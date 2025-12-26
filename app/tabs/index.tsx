@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import AppMapView from '@/components/MapView';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMarkers } from '@/components/MarkersContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -31,11 +31,10 @@ export default function Index() {
   const [locationText, setLocationText] = useState('');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // load on boot
   useEffect(() => {
     (async () => {
       try {
-        const saved = await AsyncStorage.getItem(LOCATION_STORAGE_KEY);
+        const saved = await SecureStore.getItemAsync(LOCATION_STORAGE_KEY);
         if (saved != null) setLocationText(saved);
       } catch {
         // ignore
@@ -43,21 +42,26 @@ export default function Index() {
     })();
   }, []);
 
-  // save on change (debounced)
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
+  
     saveTimer.current = setTimeout(async () => {
       try {
-        await AsyncStorage.setItem(LOCATION_STORAGE_KEY, locationText);
+        if (locationText.trim().length === 0) {
+          await SecureStore.deleteItemAsync(LOCATION_STORAGE_KEY);
+        } else {
+          await SecureStore.setItemAsync(LOCATION_STORAGE_KEY, locationText.trim());
+        }
       } catch {
         // ignore
       }
     }, 250);
-
+  
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [locationText]);
+
 
   return (
     <View style={styles.container}>
