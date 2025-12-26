@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   return (
@@ -17,11 +18,11 @@ export default function TabLayout() {
             tabBarItemStyle: styles.tabItem,
             tabBarActiveBackgroundColor: 'rgba(255, 211, 61, 0.12)',
             tabBarBackground: () => (
-              <View style={[StyleSheet.absoluteFill, styles.glassBackground]}>
-                <View style={styles.glassSheen} />
-                <View style={styles.glassHighlight} />
-                <View style={styles.glassLowlight} />
-              </View>
+              <BlurView 
+                intensity={Platform.OS === 'ios' ? 70 : 55}
+                tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
+                style={StyleSheet.absoluteFill}
+              />
             ),
         }}>
       <Tabs.Screen 
@@ -49,7 +50,7 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(37, 41, 46, 0.65)',
     borderTopWidth: 0,
     marginHorizontal: 16,
     marginBottom: 12,
@@ -67,36 +68,5 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     marginVertical: 8,
     borderRadius: 16,
-  },
-  glassBackground: {
-    borderRadius: 20,
-    backgroundColor: 'rgba(30, 34, 40, 0.88)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden',
-  },
-  glassSheen: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '55%',
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-  },
-  glassHighlight: {
-    position: 'absolute',
-    top: 6,
-    left: '10%',
-    right: '10%',
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-  },
-  glassLowlight: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '45%',
-    backgroundColor: 'rgba(0, 0, 0, 0.12)',
   },
 });
