@@ -2,22 +2,28 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-function BubbleTabButton({
-  accessibilityState,
-  children,
-  onPress,
-}: {
-  accessibilityState?: { selected?: boolean };
-  children: React.ReactNode;
-  onPress?: () => void;
-}) {
+function BubbleTabButton(props: any) {
+  const { accessibilityState, children, onPress, style, ...rest } = props;
   const selected = !!accessibilityState?.selected;
 
   return (
-    <Pressable onPress={onPress} style={styles.buttonWrap}>
+    <Pressable
+      onPress={onPress}
+      // CRITICAL: apply the style passed by the navigator
+      style={[style, styles.buttonWrap]}
+      android_ripple={{ color: 'rgba(255,255,255,0.08)', borderless: true }}
+      {...rest}
+    >
       <View style={[styles.bubble, selected && styles.bubbleSelected]}>
         {children}
       </View>
@@ -29,8 +35,8 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
-  // Pill width ~ half screen (tweak multiplier if you want)
-  const pillWidth = Math.round(screenWidth * 0.56);
+  // smaller pill (~half screen)
+  const pillWidth = Math.round(screenWidth * 0.54);
   const pillLeft = Math.round((screenWidth - pillWidth) / 2);
 
   return (
@@ -41,15 +47,19 @@ export default function TabLayout() {
 
         // no accent colors
         tabBarActiveTintColor: 'rgba(255,255,255,0.95)',
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.70)',
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.72)',
+
+        // We handle the selected bubble ourselves
+        tabBarActiveBackgroundColor: 'transparent',
 
         tabBarStyle: [
           styles.tabBar,
           {
             width: pillWidth,
-            left: pillLeft, // <-- hard-center the pill
+            left: pillLeft, // hard center
+            right: undefined, // ensure right doesn't interfere
             bottom: Math.max(insets.bottom - 6, 10),
-          },
+          } as ViewStyle,
         ],
 
         tabBarBackground: () => (
@@ -105,8 +115,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     overflow: 'hidden',
 
+    // keep layout tight and centered
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    paddingHorizontal: 10,
 
     shadowColor: '#000',
     shadowOpacity: 0.22,
@@ -135,14 +148,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
 
-  // Each tab gets half of the pill; icons are centered
+  // Each tab gets equal space (this only works if we apply navigator style!)
   buttonWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // Oval selection bubble (never square)
+  // True oval selection bubble (never square)
   bubble: {
     width: 64,
     height: 44,
