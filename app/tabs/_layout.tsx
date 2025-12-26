@@ -18,7 +18,7 @@ function BubbleTabButton(props: any) {
   return (
     <Pressable
       onPress={onPress}
-      // CRITICAL: apply navigator-provided style so each tab gets proper layout space
+      // IMPORTANT: keep the navigator-provided style so each tab takes equal space
       style={[style, styles.buttonWrap]}
       {...rest}
     >
@@ -33,8 +33,11 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
-  // Make pill shorter (adjust 0.50–0.60 to taste)
+  // Pill size: tweak the multiplier (0.50–0.60) to taste
   const pillWidth = Math.round(screenWidth * 0.54);
+
+  // TRUE horizontal centering for an absolutely positioned view
+  const left = Math.max(0, Math.round((screenWidth - pillWidth) / 2));
 
   return (
     <Tabs
@@ -42,22 +45,18 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: false,
 
-        // no accent colors
         tabBarActiveTintColor: 'rgba(255,255,255,0.95)',
         tabBarInactiveTintColor: 'rgba(255,255,255,0.70)',
 
-        // we draw our own bubble, so keep this off
         tabBarActiveBackgroundColor: 'transparent',
 
-        // BOTTOM MIDDLE — force horizontal centering
+        // Bottom pill placement (centered)
         tabBarStyle: [
           styles.tabBar,
           {
             width: pillWidth,
-            left: 0,
-            right: 0,
-            alignSelf: 'center',
-            bottom: Math.max(insets.bottom - 6, 10),
+            left, // <- this is what actually centers it
+            bottom: Math.max(insets.bottom + 10, 12),
           },
         ],
 
@@ -146,14 +145,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
 
-  // each tab gets equal space and centers its icon
+  // each tab takes equal space and centers its contents
   buttonWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // true oval selection bubble (never square)
+  // oval selection bubble (not square)
   bubble: {
     width: 64,
     height: 44,
