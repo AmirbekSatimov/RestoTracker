@@ -10,6 +10,8 @@ export default function AppMapView({ latitude, longitude, markers = [] }: Props)
   return (
     <MapView
       style={{ flex: 1 }}
+      mapType="mutedStandard"
+      userInterfaceStyle="dark"
       initialRegion={{
         latitude,
         longitude,
