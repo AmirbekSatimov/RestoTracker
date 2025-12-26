@@ -53,6 +53,23 @@ function normalizeEmoji(value) {
   return trimmed ? trimmed : '📍';
 }
 
+function chooseEmojiFromCuisine(cuisine, fallbackText) {
+  const normalized = `${cuisine || ''} ${fallbackText || ''}`.toLowerCase();
+  if (/(pizza|pizzeria|slice)/.test(normalized)) return '🍕';
+  if (/(burger|hamburger|cheeseburger)/.test(normalized)) return '🍔';
+  if (/(sushi|japanese|omakase|nigiri|roll)/.test(normalized)) return '🍣';
+  if (/(ramen|noodle)/.test(normalized)) return '🍜';
+  if (/(taco|burrito|mexican|taqueria)/.test(normalized)) return '🌮';
+  if (/(bbq|barbecue|steak|grill|steakhouse)/.test(normalized)) return '🥩';
+  if (/(coffee|cafe|espresso|latte)/.test(normalized)) return '☕';
+  if (/(bakery|pastry|croissant|bread)/.test(normalized)) return '🥐';
+  if (/(ice cream|gelato|dessert|sweet|cake)/.test(normalized)) return '🍦';
+  if (/(tea|boba|bubble tea)/.test(normalized)) return '🧋';
+  if (/(bar|cocktail|wine|brewery|beer)/.test(normalized)) return '🍺';
+  if (/(salad|vegan|vegetarian|plant-based)/.test(normalized)) return '🥗';
+  return '📍';
+}
+
 function createMarker(latitude, longitude, name = '', address = '', emoji = '📍') {
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -150,12 +167,18 @@ async function geocodePlace(extracted) {
     return null;
   }
 
+  const normalizedEmoji = normalizeEmoji(extracted?.emoji);
+  const fallbackEmoji =
+    normalizedEmoji !== '📍'
+      ? normalizedEmoji
+      : chooseEmojiFromCuisine(extracted?.cuisine, `${placeName} ${address} ${city}`);
+
   return {
     latitude: location.lat,
     longitude: location.lng,
     name: top.name || placeName,
     address: top.formatted_address || address,
-    emoji: normalizeEmoji(extracted?.emoji),
+    emoji: fallbackEmoji,
   };
 }
 
