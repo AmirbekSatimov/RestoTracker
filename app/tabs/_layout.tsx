@@ -5,116 +5,129 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-function BubbleTabButton(props: any) {
-  const { accessibilityState, children, onPress, style, ...rest } = props;
-  const selected = !!accessibilityState?.selected;
+function PillTabBar({ state, descriptors, navigation }: any) {
+  const insets = useSafeAreaInsets();
+
+  // HARD-CODED PX — edit these
+  const PILL_WIDTH_PX = 320;
+  const PILL_HEIGHT_PX = 62;
+
+  // THIS MOVES IT HORIZONTALLY (px from left edge)
+  const TAB_LEFT_PX = 292; // <-- change this. If you set 0 it goes far left. If you set 200 it shifts right.
+
+  // THIS MOVES IT VERTICALLY (px from bottom edge)
+  const TAB_BOTTOM_PX = Math.max(insets.bottom + 12, 12);
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={[style, styles.buttonWrap]}
-      {...rest}
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.pillWrap,
+        {
+          width: PILL_WIDTH_PX,
+          height: PILL_HEIGHT_PX,
+          left: TAB_LEFT_PX,
+          bottom: TAB_BOTTOM_PX,
+        },
+      ]}
     >
-      <View style={[styles.bubble, selected && styles.bubbleSelected]}>
-        {children}
+      <View style={StyleSheet.absoluteFill}>
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 85 : 60}
+          tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
+          style={[StyleSheet.absoluteFill, styles.blurClip]}
+        />
+        <View pointerEvents="none" style={styles.outerBorder} />
+        <View pointerEvents="none" style={styles.topLine} />
       </View>
-    </Pressable>
+
+      {state.routes.map((route: any, index: number) => {
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        const onLongPress = () => {
+          navigation.emit({
+            type: 'tabLongPress',
+            target: route.key,
+          });
+        };
+
+        // icon mapping
+        const iconName =
+          route.name === 'index'
+            ? isFocused
+              ? 'home'
+              : 'home-outline'
+            : route.name === 'about'
+            ? isFocused
+              ? 'people'
+              : 'people-outline'
+            : isFocused
+            ? 'ellipse'
+            : 'ellipse-outline';
+
+        const color = isFocused
+          ? 'rgba(255,255,255,0.95)'
+          : 'rgba(255,255,255,0.70)';
+
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={descriptors[route.key]?.options?.tabBarAccessibilityLabel}
+            testID={descriptors[route.key]?.options?.tabBarTestID}
+            onPress={onPress}
+            onLongPress={onLongPress}
+            style={styles.buttonWrap}
+          >
+            <View style={[styles.bubble, isFocused && styles.bubbleSelected]}>
+              <Ionicons name={iconName as any} size={28} color={color} />
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
-
-  /**
-   * HARD-CODED PIXELS (EDIT THESE)
-   * These are the only values that control positioning.
-   */
-  const PILL_WIDTH_PX = 320;
-  const PILL_HEIGHT_PX = 62;
-
-  // THIS is the line that moves it left/right.
-  // Example: 0 = flush left, 40 = a bit right, 200 = far right.
-  const TAB_LEFT_PX = 292; // <-- change this until it looks centered on YOUR simulator
-
-  // THIS moves it up/down.
-  const TAB_BOTTOM_PX = Math.max(insets.bottom + 12, 12);
-
   return (
     <Tabs
+      tabBar={(props) => <PillTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: 'rgba(255,255,255,0.95)',
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.70)',
-        tabBarActiveBackgroundColor: 'transparent',
-
-        tabBarStyle: [
-          styles.tabBar,
-          {
-            width: PILL_WIDTH_PX,
-            height: PILL_HEIGHT_PX,
-
-            // CRITICAL: do NOT set right: 0 or it will fight your left pixel positioning
-            left: TAB_LEFT_PX, // <-- THIS MOVES IT
-            bottom: TAB_BOTTOM_PX,
-          },
-        ],
-
-        tabBarBackground: () => (
-          <View style={StyleSheet.absoluteFill}>
-            <BlurView
-              intensity={Platform.OS === 'ios' ? 85 : 60}
-              tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
-              style={[StyleSheet.absoluteFill, styles.blurClip]}
-            />
-            <View pointerEvents="none" style={styles.outerBorder} />
-            <View pointerEvents="none" style={styles.topLine} />
-          </View>
-        ),
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          tabBarButton: (props) => <BubbleTabButton {...props} />,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'home' : 'home-outline'}
-              size={28}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="about"
-        options={{
-          tabBarButton: (props) => <BubbleTabButton {...props} />,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'people' : 'people-outline'}
-              size={28}
-              color={color}
-            />
-          ),
-        }}
-      />
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="about" />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
+  // This is now YOUR view, so px positioning works reliably.
+  pillWrap: {
     position: 'absolute',
     borderRadius: 999,
-    backgroundColor: 'transparent',
-    borderTopWidth: 0,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
+
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 22,
