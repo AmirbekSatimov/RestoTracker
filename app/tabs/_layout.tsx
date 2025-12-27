@@ -8,14 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 function PillTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
 
-  // HARD-CODED PX — edit these
+  // HARD-CODED PX (dp)
   const PILL_WIDTH_PX = 320;
   const PILL_HEIGHT_PX = 62;
 
-  // THIS MOVES IT HORIZONTALLY (px from left edge)
-  const TAB_LEFT_PX = 41; // <-- change this. If you set 0 it goes far left. If you set 200 it shifts right.
+  // move left/right (smaller = more left)
+  const TAB_LEFT_PX = 41;
 
-  // THIS MOVES IT VERTICALLY (px from bottom edge)
+  // move up/down
   const TAB_BOTTOM_PX = Math.max(insets.bottom + 12, 12);
 
   return (
@@ -57,13 +57,9 @@ function PillTabBar({ state, descriptors, navigation }: any) {
         };
 
         const onLongPress = () => {
-          navigation.emit({
-            type: 'tabLongPress',
-            target: route.key,
-          });
+          navigation.emit({ type: 'tabLongPress', target: route.key });
         };
 
-        // icon mapping
         const iconName =
           route.name === 'index'
             ? isFocused
@@ -84,10 +80,6 @@ function PillTabBar({ state, descriptors, navigation }: any) {
         return (
           <Pressable
             key={route.key}
-            accessibilityRole="button"
-            accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={descriptors[route.key]?.options?.tabBarAccessibilityLabel}
-            testID={descriptors[route.key]?.options?.tabBarTestID}
             onPress={onPress}
             onLongPress={onLongPress}
             style={styles.buttonWrap}
@@ -107,24 +99,17 @@ export default function TabLayout() {
     <Tabs
       tabBar={(props) => <PillTabBar {...props} />}
       screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: '#25292e' },
-        headerTintColor: 'rgba(255,255,255,0.92)',
-        headerShadowVisible: false,
-
-        // keep pill behavior
+        headerShown: false, // <-- kills the grey "Home" bar at the tabs level
         tabBarShowLabel: false,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="about" options={{ title: 'Mentions' }} />
+      <Tabs.Screen name="index" options={{ headerShown: false, title: '' }} />
+      <Tabs.Screen name="about" options={{ headerShown: false, title: '' }} />
     </Tabs>
   );
 }
 
-
 const styles = StyleSheet.create({
-  // This is now YOUR view, so px positioning works reliably.
   pillWrap: {
     position: 'absolute',
     borderRadius: 999,
@@ -133,25 +118,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
-
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 14 },
     elevation: 14,
   },
-
-  blurClip: {
-    borderRadius: 999,
-  },
-
+  blurClip: { borderRadius: 999 },
   outerBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
   },
-
   topLine: {
     position: 'absolute',
     top: 0,
@@ -160,13 +139,7 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
-
-  buttonWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
+  buttonWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   bubble: {
     width: 64,
     height: 44,
@@ -175,8 +148,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-
-  bubbleSelected: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
+  bubbleSelected: { backgroundColor: 'rgba(255,255,255,0.14)' },
 });
