@@ -10,7 +10,9 @@ export default function AboutScreen() {
   const [suggestions, setSuggestions] = useState<Array<{ name: string; placeId: string }>>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [sessionToken, setSessionToken] = useState('');
-  const { addMarker } = useMarkers();
+  const [linkStatus, setLinkStatus] = useState<'idle' | 'sending' | 'received' | 'error'>('idle');
+  const [linkError, setLinkError] = useState('');
+  const { addMarker, refreshMarkers } = useMarkers();
 
   const proxyBase = useMemo(() => process.env.EXPO_PUBLIC_PLACES_PROXY_URL?.trim() ?? '', []);
 
@@ -159,19 +161,46 @@ export default function AboutScreen() {
     }
 
     try {
+      setLinkStatus('sending');
+      setLinkError('');
       const response = await fetch(`${proxyBase.replace(/\/$/, '')}/api/ingest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
-      const data = await response.json();
+      const text = await response.text();
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (error) {
+        data = null;
+      }
       if (!response.ok) {
-        Alert.alert('Submit failed', data?.error || 'Unable to submit the link.');
+        setLinkStatus('error');
+        const message = data?.error || text || 'Unable to submit the link.';
+        setLinkError(message);
+        Alert.alert('Submit failed', message);
         return;
       }
-      Alert.alert('Link submitted', 'We received the link and will process it.');
+      if (data?.marker?.latitude && data?.marker?.longitude) {
+        refreshMarkers();
+        router.push({
+          pathname: '/tabs',
+          params: {
+            lat: data.marker.latitude.toString(),
+            lng: data.marker.longitude.toString(),
+          },
+        });
+        setLinkStatus('received');
+        Alert.alert('Location added', 'We added a location from the link.');
+      } else {
+        setLinkStatus('received');
+        Alert.alert('Link submitted', 'We received the link and will process it.');
+      }
       setLinkUrl('');
     } catch (error) {
+      setLinkStatus('error');
+      setLinkError('Unable to reach the server.');
       Alert.alert('Submit failed', 'Unable to reach the server.');
     }
   };
@@ -196,6 +225,12 @@ export default function AboutScreen() {
         <Pressable style={styles.button} onPress={handleLinkSubmit}>
           <Text style={styles.buttonText}>Send Link</Text>
         </Pressable>
+        <Text style={styles.linkStatus}>
+          {linkStatus === 'idle' && 'Status: idle'}
+          {linkStatus === 'sending' && 'Status: sending link…'}
+          {linkStatus === 'received' && 'Status: link received'}
+          {linkStatus === 'error' && `Status: error${linkError ? ` (${linkError})` : ''}`}
+        </Text>
         <Text style={styles.orDivider}>Or search by place name</Text>
         <Text style={styles.label}>Place name</Text>
         <TextInput
@@ -303,5 +338,9 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#1a1a1a',
     fontWeight: '600',
+  },
+  linkStatus: {
+    color: '#b3b8bf',
+    marginTop: 8,
   },
 });

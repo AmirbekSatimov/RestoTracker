@@ -1,7 +1,7 @@
 type Props = {
   latitude: number;
   longitude: number;
-  markers?: Array<{ id: string; latitude: number; longitude: number }>;
+  markers?: Array<{ id: string; latitude: number; longitude: number; emoji?: string }>;
 };
 
 export default function AppMapView({ latitude, longitude, markers = [] }: Props) {
@@ -13,6 +13,7 @@ export default function AppMapView({ latitude, longitude, markers = [] }: Props)
     id: marker.id,
     latitude: marker.latitude,
     longitude: marker.longitude,
+    emoji: marker.emoji || '📍',
   }));
   const srcDoc = `<!doctype html>
 <html>
@@ -33,6 +34,14 @@ export default function AppMapView({ latitude, longitude, markers = [] }: Props)
       body {
         background: #0b0f14;
       }
+      .emoji-marker {
+        background: transparent;
+        border: none;
+      }
+      .emoji-marker div {
+        font-size: 22px;
+        line-height: 1;
+      }
     </style>
   </head>
   <body>
@@ -49,13 +58,19 @@ export default function AppMapView({ latitude, longitude, markers = [] }: Props)
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
+      const iconFor = (emoji) => L.divIcon({
+        className: 'emoji-marker',
+        html: '<div>' + emoji + '</div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
       if (markers.length === 0) {
-        L.marker([${mapLatitude}, ${mapLongitude}]).addTo(map);
+        L.marker([${mapLatitude}, ${mapLongitude}], { icon: iconFor('📍') }).addTo(map);
       } else {
         const bounds = [];
         markers.forEach((marker) => {
           bounds.push([marker.latitude, marker.longitude]);
-          L.marker([marker.latitude, marker.longitude]).addTo(map);
+          L.marker([marker.latitude, marker.longitude], { icon: iconFor(marker.emoji || '📍') }).addTo(map);
         });
         if (bounds.length > 1) {
           map.fitBounds(bounds, { padding: [30, 30] });

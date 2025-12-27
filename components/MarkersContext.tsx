@@ -5,11 +5,14 @@ type MapMarker = {
   latitude: number;
   longitude: number;
   name?: string;
+  address?: string;
+  emoji?: string;
 };
 
 type MarkersContextValue = {
   markers: MapMarker[];
-  addMarker: (latitude: number, longitude: number, name?: string) => void;
+  addMarker: (latitude: number, longitude: number, name?: string, emoji?: string) => void;
+  refreshMarkers: () => void;
 };
 
 const MarkersContext = createContext<MarkersContextValue | null>(null);
@@ -24,7 +27,7 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
     return base.replace(/\/$/, '');
   }, []);
 
-  useEffect(() => {
+  const fetchMarkers = () => {
     if (!apiBase) {
       return;
     }
@@ -36,9 +39,18 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchMarkers();
   }, [apiBase]);
 
-  const addMarker = async (latitude: number, longitude: number, name?: string) => {
+  const addMarker = async (
+    latitude: number,
+    longitude: number,
+    name?: string,
+    emoji?: string
+  ) => {
     if (!apiBase) {
       setMarkers((prev) => [
         ...prev,
@@ -47,6 +59,7 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
           latitude,
           longitude,
           name,
+          emoji,
         },
       ]);
       return;
@@ -56,7 +69,7 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch(`${apiBase}/api/markers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude, longitude, name }),
+        body: JSON.stringify({ latitude, longitude, name, emoji }),
       });
       const data = await response.json();
       if (data?.marker) {
@@ -78,7 +91,10 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
     ]);
   };
 
-  const value = useMemo(() => ({ markers, addMarker }), [markers]);
+  const value = useMemo(
+    () => ({ markers, addMarker, refreshMarkers: fetchMarkers }),
+    [markers]
+  );
 
   return <MarkersContext.Provider value={value}>{children}</MarkersContext.Provider>;
 }
