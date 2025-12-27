@@ -1,6 +1,16 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useAuth } from '@/components/AuthContext';
 import { useMarkers } from '@/components/MarkersContext';
 
@@ -16,13 +26,37 @@ export default function AboutScreen() {
   const [sessionToken, setSessionToken] = useState('');
   const [linkStatus, setLinkStatus] = useState<'idle' | 'sending' | 'received' | 'error'>('idle');
   const [linkError, setLinkError] = useState('');
-  const { addMarker, refreshMarkers } = useMarkers();
+  const { addMarker, refreshMarkers, markers } = useMarkers();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'menu' | 'link' | 'search'>('menu');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const apiBase = useMemo(() => process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ?? '', []);
   const proxyBase = useMemo(
     () => process.env.EXPO_PUBLIC_PLACES_PROXY_URL?.trim() ?? apiBase,
     [apiBase]
   );
+
+  const sortedMarkers = useMemo(() => {
+    return [...markers].sort((a, b) => {
+      const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
+      const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
+      if (aTime !== bTime) {
+        return bTime - aTime;
+      }
+      const aId = typeof a.id === 'number' ? a.id : Number.parseInt(String(a.id), 10) || 0;
+      const bId = typeof b.id === 'number' ? b.id : Number.parseInt(String(b.id), 10) || 0;
+      return bId - aId;
+    });
+  }, [markers]);
+
+  const getCity = (address?: string) => {
+    if (!address) {
+      return '';
+    }
+    const parts = address.split(',').map((part) => part.trim()).filter(Boolean);
+    return parts.length >= 2 ? parts[1] : parts[0] || '';
+  };
 
   useEffect(() => {
     if (!proxyBase) {
@@ -260,100 +294,199 @@ export default function AboutScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Add Location</Text>
-      <Text style={styles.status}>
-        Proxy status: {proxyStatus === 'checking' ? 'checking...' : proxyStatus}
-      </Text>
-      <View style={styles.form}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <TextInput
-          style={styles.input}
-          value={authUsername}
-          onChangeText={setAuthUsername}
-          placeholder="Username"
-          placeholderTextColor="#9aa0a6"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          value={authPassword}
-          onChangeText={setAuthPassword}
-          placeholder="Password"
-          placeholderTextColor="#9aa0a6"
-          secureTextEntry
-        />
-        <View style={styles.authButtons}>
-          <Pressable style={styles.buttonCompact} onPress={handleLogin}>
-            <Text style={styles.buttonTextDark}>Log in</Text>
-          </Pressable>
-          <Pressable style={styles.buttonCompact} onPress={handleRegister}>
-            <Text style={styles.buttonTextDark}>Register</Text>
-          </Pressable>
-        </View>
-        <View style={styles.authFooter}>
-          <Text style={styles.authStatus}>
-            {token && user ? `Signed in as ${user.username}` : 'Not signed in'}
-          </Text>
-          {token ? (
-            <Pressable onPress={logout}>
-              <Text style={styles.linkText}>Sign out</Text>
-            </Pressable>
-          ) : null}
-        </View>
-        {authStatus === 'error' && authError ? (
-          <Text style={styles.authError}>Auth error: {authError}</Text>
-        ) : null}
-        <Text style={styles.orDivider}>Add from link</Text>
-        <Text style={styles.label}>TikTok/Instagram link</Text>
-        <TextInput
-          style={styles.input}
-          value={linkUrl}
-          onChangeText={setLinkUrl}
-          placeholder="https://www.tiktok.com/@user/video/..."
-          placeholderTextColor="#9aa0a6"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <Pressable style={styles.button} onPress={handleLinkSubmit}>
-          <Text style={styles.buttonText}>Send Link</Text>
-        </Pressable>
-        <Text style={styles.linkStatus}>
-          {linkStatus === 'idle' && 'Status: idle'}
-          {linkStatus === 'sending' && 'Status: sending link...'}
-          {linkStatus === 'received' && 'Status: link received'}
-          {linkStatus === 'error' && `Status: error${linkError ? ` (${linkError})` : ''}`}
-        </Text>
-        <Text style={styles.orDivider}>Or search by place name</Text>
-        <Text style={styles.label}>Place name</Text>
-        <TextInput
-          style={styles.input}
-          value={placeQuery}
-          onChangeText={setPlaceQuery}
-          placeholder="e.g. Pizza Hut Toronto"
-          placeholderTextColor="#9aa0a6"
-          autoCapitalize="none"
-        />
-        {isSuggesting ? (
-          <Text style={styles.suggestingText}>Searching...</Text>
-        ) : (
-          suggestions.length > 0 && (
-            <View style={styles.suggestions}>
-              {suggestions.map((suggestion) => (
-                <Pressable
-                  key={suggestion.placeId}
-                  style={styles.suggestionItem}
-                  onPress={() => handleSuggestionPress(suggestion.placeId, suggestion.name)}
-                >
-                  <Text style={styles.suggestionTitle}>{suggestion.name}</Text>
-                </Pressable>
-              ))}
+      <FlatList
+        data={sortedMarkers}
+        keyExtractor={(item) => String(item.id)}
+        numColumns={2}
+        columnWrapperStyle={styles.cardRow}
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.title}>Add Location</Text>
+            <Text style={styles.status}>
+              Proxy status: {proxyStatus === 'checking' ? 'checking...' : proxyStatus}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <Pressable
+            style={styles.card}
+            onPress={() =>
+              router.push({
+                pathname: '/tabs',
+                params: {
+                  lat: item.latitude.toString(),
+                  lng: item.longitude.toString(),
+                },
+              })
+            }
+          >
+            <View style={styles.cardEmoji}>
+              <Text style={styles.cardEmojiText}>{item.emoji || '📍'}</Text>
             </View>
-          )
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {item.name || 'Unknown place'}
+            </Text>
+            <Text style={styles.cardCity} numberOfLines={1}>
+              {getCity(item.address)}
+            </Text>
+            {item.sourceUrl ? (
+              <Text style={styles.cardLink} numberOfLines={1}>
+                {item.sourceUrl}
+              </Text>
+            ) : null}
+          </Pressable>
         )}
-        <Pressable style={styles.button} onPress={handlePlaceSearch}>
-          <Text style={styles.buttonText}>Search Place</Text>
-        </Pressable>
-      </View>
+      />
+      <Pressable style={styles.settingsButton} onPress={() => setIsSettingsOpen(true)}>
+        <Text style={styles.settingsIcon}>⚙</Text>
+      </Pressable>
+      <Pressable
+        style={styles.fab}
+        onPress={() => {
+          setModalMode('menu');
+          setIsModalOpen(true);
+        }}
+      >
+        <Text style={styles.fabIcon}>+</Text>
+      </Pressable>
+      <Modal
+        animationType="slide"
+        transparent
+        visible={isSettingsOpen}
+        onRequestClose={() => setIsSettingsOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Account</Text>
+            <TextInput
+              style={styles.input}
+              value={authUsername}
+              onChangeText={setAuthUsername}
+              placeholder="Username"
+              placeholderTextColor="#9aa0a6"
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.input}
+              value={authPassword}
+              onChangeText={setAuthPassword}
+              placeholder="Password"
+              placeholderTextColor="#9aa0a6"
+              secureTextEntry
+            />
+            <View style={styles.authButtons}>
+              <Pressable style={styles.buttonCompact} onPress={handleLogin}>
+                <Text style={styles.buttonTextDark}>Log in</Text>
+              </Pressable>
+              <Pressable style={styles.buttonCompact} onPress={handleRegister}>
+                <Text style={styles.buttonTextDark}>Register</Text>
+              </Pressable>
+            </View>
+            <View style={styles.authFooter}>
+              <Text style={styles.authStatus}>
+                {token && user ? `Signed in as ${user.username}` : 'Not signed in'}
+              </Text>
+              {token ? (
+                <Pressable onPress={logout}>
+                  <Text style={styles.linkText}>Sign out</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            {authStatus === 'error' && authError ? (
+              <Text style={styles.authError}>Auth error: {authError}</Text>
+            ) : null}
+            <Pressable style={styles.modalCancel} onPress={() => setIsSettingsOpen(false)}>
+              <Text style={styles.modalCancelText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        transparent
+        visible={isModalOpen}
+        onRequestClose={() => setIsModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            {modalMode === 'menu' ? (
+              <>
+                <Text style={styles.modalTitle}>Add location</Text>
+                <Pressable style={styles.modalOption} onPress={() => setModalMode('link')}>
+                  <Text style={styles.modalOptionText}>Paste a link</Text>
+                </Pressable>
+                <Pressable style={styles.modalOption} onPress={() => setModalMode('search')}>
+                  <Text style={styles.modalOptionText}>Search by name</Text>
+                </Pressable>
+                <Pressable style={styles.modalCancel} onPress={() => setIsModalOpen(false)}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+              </>
+            ) : modalMode === 'link' ? (
+              <>
+                <Text style={styles.modalTitle}>Paste link</Text>
+                <TextInput
+                  style={styles.input}
+                  value={linkUrl}
+                  onChangeText={setLinkUrl}
+                  placeholder="https://www.tiktok.com/@user/video/..."
+                  placeholderTextColor="#9aa0a6"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable style={styles.button} onPress={handleLinkSubmit}>
+                  <Text style={styles.buttonText}>Send Link</Text>
+                </Pressable>
+                <Text style={styles.linkStatus}>
+                  {linkStatus === 'idle' && 'Status: idle'}
+                  {linkStatus === 'sending' && 'Status: sending link...'}
+                  {linkStatus === 'received' && 'Status: link received'}
+                  {linkStatus === 'error' && `Status: error${linkError ? ` (${linkError})` : ''}`}
+                </Text>
+                <Pressable style={styles.modalCancel} onPress={() => setModalMode('menu')}>
+                  <Text style={styles.modalCancelText}>Back</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalTitle}>Search place</Text>
+                <TextInput
+                  style={styles.input}
+                  value={placeQuery}
+                  onChangeText={setPlaceQuery}
+                  placeholder="e.g. Pizza Hut Toronto"
+                  placeholderTextColor="#9aa0a6"
+                  autoCapitalize="none"
+                />
+                {isSuggesting ? (
+                  <Text style={styles.suggestingText}>Searching...</Text>
+                ) : (
+                  suggestions.length > 0 && (
+                    <View style={styles.suggestions}>
+                      {suggestions.map((suggestion) => (
+                        <Pressable
+                          key={suggestion.placeId}
+                          style={styles.suggestionItem}
+                          onPress={() => handleSuggestionPress(suggestion.placeId, suggestion.name)}
+                        >
+                          <Text style={styles.suggestionTitle}>{suggestion.name}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )
+                )}
+                <Pressable style={styles.button} onPress={handlePlaceSearch}>
+                  <Text style={styles.buttonText}>Search Place</Text>
+                </Pressable>
+                <Pressable style={styles.modalCancel} onPress={() => setModalMode('menu')}>
+                  <Text style={styles.modalCancelText}>Back</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -362,9 +495,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#25292e',
-    justifyContent: 'center',
+    alignItems: 'stretch',
+  },
+  header: {
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
   },
   title: {
     color: '#fff',
@@ -376,19 +512,46 @@ const styles = StyleSheet.create({
     color: '#b3b8bf',
     marginBottom: 12,
   },
-  sectionTitle: {
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 120,
+  },
+  cardRow: {
+    justifyContent: 'space-between',
+  },
+  card: {
+    width: '48%',
+    height: 160,
+    backgroundColor: '#1f2328',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+  },
+  cardEmoji: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#25292e',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  cardEmojiText: {
+    fontSize: 16,
+  },
+  cardTitle: {
     color: '#fff',
     fontWeight: '600',
-    marginBottom: 8,
-  },
-  form: {
-    width: '100%',
-    maxWidth: 360,
-  },
-  label: {
-    color: '#fff',
     marginBottom: 6,
-    marginTop: 12,
+  },
+  cardCity: {
+    color: '#b3b8bf',
+    fontSize: 12,
+  },
+  cardLink: {
+    color: '#9aa0a6',
+    fontSize: 11,
+    marginTop: 8,
   },
   input: {
     backgroundColor: '#1f2328',
@@ -436,10 +599,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginHorizontal: 4,
   },
-  orDivider: {
-    color: '#b3b8bf',
-    marginTop: 16,
-  },
   buttonText: {
     color: '#1a1a1a',
     fontWeight: '600',
@@ -473,5 +632,80 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#ffd33d',
     fontSize: 12,
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: 18,
+    right: 18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1f2328',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsIcon: {
+    color: '#fff',
+    fontSize: 18,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ffd33d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  fabIcon: {
+    color: '#1a1a1a',
+    fontSize: 28,
+    fontWeight: '700',
+    marginTop: -2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#25292e',
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  modalOption: {
+    backgroundColor: '#1f2328',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 10,
+  },
+  modalOptionText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  modalCancel: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#b3b8bf',
   },
 });

@@ -8,6 +8,8 @@ type MapMarker = {
   name?: string;
   address?: string;
   emoji?: string;
+  createdAt?: string;
+  sourceUrl?: string;
 };
 
 type MarkersContextValue = {
