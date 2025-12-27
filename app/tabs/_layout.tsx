@@ -2,13 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function BubbleTabButton(props: any) {
@@ -18,7 +12,6 @@ function BubbleTabButton(props: any) {
   return (
     <Pressable
       onPress={onPress}
-      // keep the navigator-provided style so each tab slot is sized properly
       style={[style, styles.buttonWrap]}
       {...rest}
     >
@@ -31,44 +24,39 @@ function BubbleTabButton(props: any) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
 
   /**
-   * PIXEL POSITIONING (edit these)
-   * - PILL_WIDTH: exact width in pixels
-   * - PILL_BOTTOM: distance from very bottom (safe-area included)
+   * HARD-CODED PIXELS (EDIT THESE)
+   * These are the only values that control positioning.
    */
-  const PILL_WIDTH = 320; // <-- change this (e.g. 280, 300, 340)
-  const PILL_HEIGHT = 62;
+  const PILL_WIDTH_PX = 320;
+  const PILL_HEIGHT_PX = 62;
 
-  // exact centered left pixel
-  const leftPx = Math.round((screenWidth - PILL_WIDTH) / 2);
+  // THIS is the line that moves it left/right.
+  // Example: 0 = flush left, 40 = a bit right, 200 = far right.
+  const TAB_LEFT_PX = 292; // <-- change this until it looks centered on YOUR simulator
 
-  // exact bottom pixel (safe area included). Increase to lift it up.
-  const PILL_BOTTOM = Math.round(insets.bottom + 12);
+  // THIS moves it up/down.
+  const TAB_BOTTOM_PX = Math.max(insets.bottom + 12, 12);
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-
         tabBarActiveTintColor: 'rgba(255,255,255,0.95)',
         tabBarInactiveTintColor: 'rgba(255,255,255,0.70)',
         tabBarActiveBackgroundColor: 'transparent',
 
-        /**
-         * IMPORTANT:
-         * - DO NOT set left: 0 / right: 0.
-         * - We set a fixed width and a computed leftPx instead.
-         */
         tabBarStyle: [
           styles.tabBar,
           {
-            width: PILL_WIDTH,
-            height: PILL_HEIGHT,
-            left: leftPx,
-            bottom: PILL_BOTTOM,
+            width: PILL_WIDTH_PX,
+            height: PILL_HEIGHT_PX,
+
+            // CRITICAL: do NOT set right: 0 or it will fight your left pixel positioning
+            left: TAB_LEFT_PX, // <-- THIS MOVES IT
+            bottom: TAB_BOTTOM_PX,
           },
         ],
 
@@ -119,17 +107,14 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-
     borderRadius: 999,
     backgroundColor: 'transparent',
     borderTopWidth: 0,
     overflow: 'hidden',
-
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
-
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 22,
@@ -157,14 +142,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
 
-  // tab slot alignment
   buttonWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // oval selection bubble
   bubble: {
     width: 64,
     height: 44,
