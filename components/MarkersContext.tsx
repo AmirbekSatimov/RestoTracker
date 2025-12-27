@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/components/AuthContext';
 
 type MapMarker = {
   id: string;
@@ -19,6 +20,7 @@ const MarkersContext = createContext<MarkersContextValue | null>(null);
 
 export function MarkersProvider({ children }: { children: React.ReactNode }) {
   const [markers, setMarkers] = useState<MapMarker[]>([]);
+  const { token } = useAuth();
   const apiBase = useMemo(() => {
     const base =
       process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ??
@@ -28,10 +30,13 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchMarkers = () => {
-    if (!apiBase) {
+    if (!apiBase || !token) {
+      setMarkers([]);
       return;
     }
-    fetch(`${apiBase}/api/markers`)
+    fetch(`${apiBase}/api/markers`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((response) => response.json())
       .then((data) => {
         if (Array.isArray(data?.markers)) {
@@ -43,7 +48,7 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetchMarkers();
-  }, [apiBase]);
+  }, [apiBase, token]);
 
   const addMarker = async (
     latitude: number,
@@ -51,24 +56,17 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
     name?: string,
     emoji?: string
   ) => {
-    if (!apiBase) {
-      setMarkers((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          latitude,
-          longitude,
-          name,
-          emoji,
-        },
-      ]);
+    if (!apiBase || !token) {
       return;
     }
 
     try {
       const response = await fetch(`${apiBase}/api/markers`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ latitude, longitude, name, emoji }),
       });
       const data = await response.json();
@@ -77,23 +75,13 @@ export function MarkersProvider({ children }: { children: React.ReactNode }) {
         return;
       }
     } catch (error) {
-      // Fall back to local state if the server is unreachable.
+      // No-op: keep server as the source of truth.
     }
-
-    setMarkers((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        latitude,
-        longitude,
-        name,
-      },
-    ]);
   };
 
   const value = useMemo(
     () => ({ markers, addMarker, refreshMarkers: fetchMarkers }),
-    [markers]
+    [markers, apiBase, token]
   );
 
   return <MarkersContext.Provider value={value}>{children}</MarkersContext.Provider>;

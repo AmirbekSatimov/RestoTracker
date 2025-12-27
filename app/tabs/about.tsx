@@ -1,11 +1,15 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useAuth } from '@/components/AuthContext';
 import { useMarkers } from '@/components/MarkersContext';
 
 export default function AboutScreen() {
+  const { token, user, authStatus, authError, login, register, logout } = useAuth();
   const [linkUrl, setLinkUrl] = useState('');
   const [placeQuery, setPlaceQuery] = useState('');
+  const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
   const [proxyStatus, setProxyStatus] = useState<'checking' | 'ok' | 'error'>('checking');
   const [suggestions, setSuggestions] = useState<Array<{ name: string; placeId: string }>>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -14,7 +18,11 @@ export default function AboutScreen() {
   const [linkError, setLinkError] = useState('');
   const { addMarker, refreshMarkers } = useMarkers();
 
-  const proxyBase = useMemo(() => process.env.EXPO_PUBLIC_PLACES_PROXY_URL?.trim() ?? '', []);
+  const apiBase = useMemo(() => process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ?? '', []);
+  const proxyBase = useMemo(
+    () => process.env.EXPO_PUBLIC_PLACES_PROXY_URL?.trim() ?? apiBase,
+    [apiBase]
+  );
 
   useEffect(() => {
     if (!proxyBase) {
@@ -29,7 +37,7 @@ export default function AboutScreen() {
       .catch(() => {
         setProxyStatus('error');
       });
-  }, []);
+  }, [proxyBase]);
 
   useEffect(() => {
     const trimmedQuery = placeQuery.trim();
@@ -43,13 +51,13 @@ export default function AboutScreen() {
     const timeout = setTimeout(async () => {
       setIsSuggesting(true);
       try {
-        const token = sessionToken || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const tokenValue = sessionToken || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         if (!sessionToken) {
-          setSessionToken(token);
+          setSessionToken(tokenValue);
         }
         const url = `${normalized}/api/places?query=${encodeURIComponent(
           trimmedQuery
-        )}&sessionToken=${encodeURIComponent(token)}`;
+        )}&sessionToken=${encodeURIComponent(tokenValue)}`;
         const response = await fetch(url, { signal: controller.signal });
         const data = await response.json();
         if (data.status !== 'OK' || !data.predictions?.length) {
@@ -72,17 +80,51 @@ export default function AboutScreen() {
       controller.abort();
       clearTimeout(timeout);
     };
-  }, [placeQuery, proxyBase]);
+  }, [placeQuery, proxyBase, sessionToken]);
+
+  const handleLogin = async () => {
+    const username = authUsername.trim();
+    const password = authPassword.trim();
+    if (!username || !password) {
+      Alert.alert('Missing credentials', 'Enter a username and password.');
+      return;
+    }
+    const result = await login(username, password);
+    if (!result.ok) {
+      Alert.alert('Login failed', result.error || 'Unable to log in.');
+      return;
+    }
+    setAuthPassword('');
+  };
+
+  const handleRegister = async () => {
+    const username = authUsername.trim();
+    const password = authPassword.trim();
+    if (!username || !password) {
+      Alert.alert('Missing credentials', 'Enter a username and password.');
+      return;
+    }
+    const result = await register(username, password);
+    if (!result.ok) {
+      Alert.alert('Registration failed', result.error || 'Unable to create account.');
+      return;
+    }
+    setAuthPassword('');
+  };
 
   const handleSuggestionPress = async (placeId: string, label: string) => {
+    if (!token) {
+      Alert.alert('Sign in required', 'Log in to save markers to your account.');
+      return;
+    }
     if (!proxyBase) {
       Alert.alert('Missing proxy', 'Set EXPO_PUBLIC_PLACES_PROXY_URL to use the Places proxy.');
       return;
     }
     const normalized = proxyBase.replace(/\/$/, '');
     try {
-      const token = sessionToken;
-      const tokenParam = token ? `&sessionToken=${encodeURIComponent(token)}` : '';
+      const tokenValue = sessionToken;
+      const tokenParam = tokenValue ? `&sessionToken=${encodeURIComponent(tokenValue)}` : '';
       const url = `${normalized}/api/place-details?placeId=${encodeURIComponent(placeId)}${tokenParam}`;
       const response = await fetch(url);
       const data = await response.json();
@@ -94,7 +136,7 @@ export default function AboutScreen() {
       setPlaceQuery(label);
       setSuggestions([]);
       setSessionToken('');
-      addMarker(location.lat, location.lng, placeQuery.trim());
+      addMarker(location.lat, location.lng, label);
       router.push({
         pathname: '/tabs',
         params: { lat: location.lat.toString(), lng: location.lng.toString() },
@@ -107,6 +149,10 @@ export default function AboutScreen() {
   const handlePlaceSearch = async () => {
     if (!placeQuery.trim()) {
       Alert.alert('Missing place', 'Enter a place name to search.');
+      return;
+    }
+    if (!token) {
+      Alert.alert('Sign in required', 'Log in to save markers to your account.');
       return;
     }
 
@@ -139,7 +185,7 @@ export default function AboutScreen() {
         Alert.alert('No location data', 'The place does not include coordinates.');
         return;
       }
-      addMarker(location.lat, location.lng, label);
+      addMarker(location.lat, location.lng, placeQuery.trim());
       router.push({
         pathname: '/tabs',
         params: { lat: location.lat.toString(), lng: location.lng.toString() },
@@ -155,7 +201,11 @@ export default function AboutScreen() {
       Alert.alert('Missing link', 'Paste a TikTok or Instagram link.');
       return;
     }
-    if (!proxyBase) {
+    if (!token) {
+      Alert.alert('Sign in required', 'Log in to save markers to your account.');
+      return;
+    }
+    if (!apiBase) {
       Alert.alert('Missing proxy', 'Set EXPO_PUBLIC_API_BASE_URL to use the server.');
       return;
     }
@@ -163,9 +213,12 @@ export default function AboutScreen() {
     try {
       setLinkStatus('sending');
       setLinkError('');
-      const response = await fetch(`${proxyBase.replace(/\/$/, '')}/api/ingest`, {
+      const response = await fetch(`${apiBase.replace(/\/$/, '')}/api/ingest`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ url }),
       });
       const text = await response.text();
@@ -209,9 +262,48 @@ export default function AboutScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Add Location</Text>
       <Text style={styles.status}>
-        Proxy status: {proxyStatus === 'checking' ? 'checking…' : proxyStatus}
+        Proxy status: {proxyStatus === 'checking' ? 'checking...' : proxyStatus}
       </Text>
       <View style={styles.form}>
+        <Text style={styles.sectionTitle}>Account</Text>
+        <TextInput
+          style={styles.input}
+          value={authUsername}
+          onChangeText={setAuthUsername}
+          placeholder="Username"
+          placeholderTextColor="#9aa0a6"
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          value={authPassword}
+          onChangeText={setAuthPassword}
+          placeholder="Password"
+          placeholderTextColor="#9aa0a6"
+          secureTextEntry
+        />
+        <View style={styles.authButtons}>
+          <Pressable style={styles.buttonCompact} onPress={handleLogin}>
+            <Text style={styles.buttonTextDark}>Log in</Text>
+          </Pressable>
+          <Pressable style={styles.buttonCompact} onPress={handleRegister}>
+            <Text style={styles.buttonTextDark}>Register</Text>
+          </Pressable>
+        </View>
+        <View style={styles.authFooter}>
+          <Text style={styles.authStatus}>
+            {token && user ? `Signed in as ${user.username}` : 'Not signed in'}
+          </Text>
+          {token ? (
+            <Pressable onPress={logout}>
+              <Text style={styles.linkText}>Sign out</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        {authStatus === 'error' && authError ? (
+          <Text style={styles.authError}>Auth error: {authError}</Text>
+        ) : null}
+        <Text style={styles.orDivider}>Add from link</Text>
         <Text style={styles.label}>TikTok/Instagram link</Text>
         <TextInput
           style={styles.input}
@@ -227,7 +319,7 @@ export default function AboutScreen() {
         </Pressable>
         <Text style={styles.linkStatus}>
           {linkStatus === 'idle' && 'Status: idle'}
-          {linkStatus === 'sending' && 'Status: sending link…'}
+          {linkStatus === 'sending' && 'Status: sending link...'}
           {linkStatus === 'received' && 'Status: link received'}
           {linkStatus === 'error' && `Status: error${linkError ? ` (${linkError})` : ''}`}
         </Text>
@@ -242,7 +334,7 @@ export default function AboutScreen() {
           autoCapitalize="none"
         />
         {isSuggesting ? (
-          <Text style={styles.suggestingText}>Searching…</Text>
+          <Text style={styles.suggestingText}>Searching...</Text>
         ) : (
           suggestions.length > 0 && (
             <View style={styles.suggestions}>
@@ -283,6 +375,11 @@ const styles = StyleSheet.create({
   status: {
     color: '#b3b8bf',
     marginBottom: 12,
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontWeight: '600',
+    marginBottom: 8,
   },
   form: {
     width: '100%',
@@ -331,6 +428,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
   },
+  buttonCompact: {
+    flex: 1,
+    backgroundColor: '#ffd33d',
+    borderRadius: 8,
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginHorizontal: 4,
+  },
   orDivider: {
     color: '#b3b8bf',
     marginTop: 16,
@@ -339,8 +444,34 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     fontWeight: '600',
   },
+  buttonTextDark: {
+    color: '#1a1a1a',
+    fontWeight: '600',
+  },
   linkStatus: {
     color: '#b3b8bf',
     marginTop: 8,
+  },
+  authButtons: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  authFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  authStatus: {
+    color: '#b3b8bf',
+    fontSize: 12,
+  },
+  authError: {
+    color: '#ff9b9b',
+    marginBottom: 8,
+  },
+  linkText: {
+    color: '#ffd33d',
+    fontSize: 12,
   },
 });

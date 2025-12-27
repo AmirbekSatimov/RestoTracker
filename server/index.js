@@ -1,17 +1,22 @@
+import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
 
 dotenv.config();
 
 const app = express();
 const port = Number.parseInt(process.env.PORT ?? '5050', 10);
 const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+const jwtSecret = process.env.JWT_SECRET;
 const ytDlpPath = process.env.YTDLP_PATH || 'yt-dlp';
 const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
 const pythonPath = process.env.PYTHON_PATH || 'python3';
@@ -22,64 +27,80 @@ const ytDlpCookies = process.env.YTDLP_COOKIES || '';
 const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
 const ollamaModel = process.env.OLLAMA_MODEL || 'qwen2.5';
 const dataDir = path.join(process.cwd(), 'data');
-const markersFile = path.join(dataDir, 'markers.json');
+const dbFile = path.join(dataDir, 'app.db');
 const execFileAsync = promisify(execFile);
+
+const EMOJI = {
+  pin: '\u{1F4CD}',
+  pizza: '\u{1F355}',
+  burger: '\u{1F354}',
+  sushi: '\u{1F363}',
+  ramen: '\u{1F35C}',
+  taco: '\u{1F32E}',
+  steak: '\u{1F969}',
+  coffee: '\u{2615}',
+  bakery: '\u{1F950}',
+  iceCream: '\u{1F366}',
+  boba: '\u{1F9CB}',
+  beer: '\u{1F37A}',
+  salad: '\u{1F957}',
+};
 
 app.use(cors());
 app.use(express.json());
 
-async function loadMarkers() {
-  try {
-    const raw = await fs.readFile(markersFile, 'utf8');
-    return JSON.parse(raw);
-  } catch (error) {
-    if (error && error.code === 'ENOENT') {
-      return [];
-    }
-    throw error;
-  }
+async function initDb() {
+  await fs.mkdir(dataDir, { recursive: true });
+  const db = await open({ filename: dbFile, driver: sqlite3.Database });
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS markers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      name TEXT,
+      address TEXT,
+      emoji TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `);
+  return db;
 }
 
-async function saveMarkers(markers) {
-  await fs.mkdir(dataDir, { recursive: true });
-  await fs.writeFile(markersFile, `${JSON.stringify(markers, null, 2)}\n`);
-}
+const dbPromise = initDb();
 
 function normalizeEmoji(value) {
   if (typeof value !== 'string') {
-    return '📍';
+    return EMOJI.pin;
   }
   const trimmed = value.trim();
-  return trimmed ? trimmed : '📍';
+  return trimmed ? trimmed : EMOJI.pin;
 }
 
 function chooseEmojiFromCuisine(cuisine, fallbackText) {
   const normalized = `${cuisine || ''} ${fallbackText || ''}`.toLowerCase();
-  if (/(pizza|pizzeria|slice)/.test(normalized)) return '🍕';
-  if (/(burger|hamburger|cheeseburger)/.test(normalized)) return '🍔';
-  if (/(sushi|japanese|omakase|nigiri|roll)/.test(normalized)) return '🍣';
-  if (/(ramen|noodle)/.test(normalized)) return '🍜';
-  if (/(taco|burrito|mexican|taqueria)/.test(normalized)) return '🌮';
-  if (/(bbq|barbecue|steak|grill|steakhouse)/.test(normalized)) return '🥩';
-  if (/(coffee|cafe|espresso|latte)/.test(normalized)) return '☕';
-  if (/(bakery|pastry|croissant|bread)/.test(normalized)) return '🥐';
-  if (/(ice cream|gelato|dessert|sweet|cake)/.test(normalized)) return '🍦';
-  if (/(tea|boba|bubble tea)/.test(normalized)) return '🧋';
-  if (/(bar|cocktail|wine|brewery|beer)/.test(normalized)) return '🍺';
-  if (/(salad|vegan|vegetarian|plant-based)/.test(normalized)) return '🥗';
-  return '📍';
-}
-
-function createMarker(latitude, longitude, name = '', address = '', emoji = '📍') {
-  return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    latitude,
-    longitude,
-    name,
-    address,
-    emoji: normalizeEmoji(emoji),
-    createdAt: new Date().toISOString(),
-  };
+  if (/(pizza|pizzeria|slice)/.test(normalized)) return EMOJI.pizza;
+  if (/(burger|hamburger|cheeseburger)/.test(normalized)) return EMOJI.burger;
+  if (/(sushi|japanese|omakase|nigiri|roll)/.test(normalized)) return EMOJI.sushi;
+  if (/(ramen|noodle)/.test(normalized)) return EMOJI.ramen;
+  if (/(taco|burrito|mexican|taqueria)/.test(normalized)) return EMOJI.taco;
+  if (/(bbq|barbecue|steak|grill|steakhouse)/.test(normalized)) return EMOJI.steak;
+  if (/(coffee|cafe|espresso|latte)/.test(normalized)) return EMOJI.coffee;
+  if (/(bakery|pastry|croissant|bread)/.test(normalized)) return EMOJI.bakery;
+  if (/(ice cream|gelato|dessert|sweet|cake)/.test(normalized)) return EMOJI.iceCream;
+  if (/(tea|boba|bubble tea)/.test(normalized)) return EMOJI.boba;
+  if (/(bar|cocktail|wine|brewery|beer)/.test(normalized)) return EMOJI.beer;
+  if (/(salad|vegan|vegetarian|plant-based)/.test(normalized)) return EMOJI.salad;
+  return EMOJI.pin;
 }
 
 function extractJson(text) {
@@ -100,19 +121,19 @@ async function extractPlaceInfo(transcript) {
 Return ONLY valid JSON with keys:
 placeName (string), address (string), city (string), cuisine (string), clues (string), confidence (number 0-1), emoji (string, single emoji).
 Choose the emoji based on cuisine:
-- pizza -> 🍕
-- burgers -> 🍔
-- sushi/japanese -> 🍣
-- ramen/noodles -> 🍜
-- tacos/mexican -> 🌮
-- bbq/steak -> 🥩
-- coffee/cafe -> ☕
-- bakery/dessert -> 🥐
-- ice cream/dessert -> 🍦
-- tea/boba -> 🧋
-- bar/drinks -> 🍺
-- salad/vegan/vegetarian -> 🥗
-If unknown, use empty strings and low confidence, and emoji 📍.
+- pizza -> ${EMOJI.pizza}
+- burgers -> ${EMOJI.burger}
+- sushi/japanese -> ${EMOJI.sushi}
+- ramen/noodles -> ${EMOJI.ramen}
+- tacos/mexican -> ${EMOJI.taco}
+- bbq/steak -> ${EMOJI.steak}
+- coffee/cafe -> ${EMOJI.coffee}
+- bakery/dessert -> ${EMOJI.bakery}
+- ice cream/dessert -> ${EMOJI.iceCream}
+- tea/boba -> ${EMOJI.boba}
+- bar/drinks -> ${EMOJI.beer}
+- salad/vegan/vegetarian -> ${EMOJI.salad}
+If unknown, use empty strings and low confidence, and emoji ${EMOJI.pin}.
 
 Transcript:
 ${transcript}`;
@@ -169,7 +190,7 @@ async function geocodePlace(extracted) {
 
   const normalizedEmoji = normalizeEmoji(extracted?.emoji);
   const fallbackEmoji =
-    normalizedEmoji !== '📍'
+    normalizedEmoji !== EMOJI.pin
       ? normalizedEmoji
       : chooseEmojiFromCuisine(extracted?.cuisine, `${placeName} ${address} ${city}`);
 
@@ -182,21 +203,139 @@ async function geocodePlace(extracted) {
   };
 }
 
+async function insertMarker(db, userId, marker) {
+  const createdAt = new Date().toISOString();
+  const result = await db.run(
+    `INSERT INTO markers (user_id, latitude, longitude, name, address, emoji, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    userId,
+    marker.latitude,
+    marker.longitude,
+    marker.name ?? '',
+    marker.address ?? '',
+    normalizeEmoji(marker.emoji),
+    createdAt
+  );
+  return {
+    id: result.lastID,
+    latitude: marker.latitude,
+    longitude: marker.longitude,
+    name: marker.name ?? '',
+    address: marker.address ?? '',
+    emoji: normalizeEmoji(marker.emoji),
+    createdAt,
+  };
+}
+
+function requireAuth(req, res, next) {
+  if (!jwtSecret) {
+    res.status(500).json({ error: 'JWT secret not configured.' });
+    return;
+  }
+  const header = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!token) {
+    res.status(401).json({ error: 'Missing auth token.' });
+    return;
+  }
+  try {
+    const payload = jwt.verify(token, jwtSecret);
+    req.user = { id: payload.userId, username: payload.username };
+    next();
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid auth token.' });
+  }
+}
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/markers', async (req, res) => {
+app.post('/auth/register', async (req, res) => {
+  const { username, password } = req.body ?? {};
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    res.status(400).json({ error: 'Username and password are required.' });
+    return;
+  }
+  const trimmedUsername = username.trim();
+  const trimmedPassword = password.trim();
+  if (trimmedUsername.length < 3 || trimmedPassword.length < 6) {
+    res.status(400).json({ error: 'Username or password too short.' });
+    return;
+  }
   try {
-    const markers = await loadMarkers();
+    const db = await dbPromise;
+    const hash = await bcrypt.hash(trimmedPassword, 10);
+    const createdAt = new Date().toISOString();
+    const result = await db.run(
+      'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)',
+      trimmedUsername,
+      hash,
+      createdAt
+    );
+    const token = jwt.sign(
+      { userId: result.lastID, username: trimmedUsername },
+      jwtSecret,
+      { expiresIn: '7d' }
+    );
+    res.status(201).json({ token, user: { id: result.lastID, username: trimmedUsername } });
+  } catch (error) {
+    if (error?.code === 'SQLITE_CONSTRAINT') {
+      res.status(409).json({ error: 'Username already exists.' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to create account.' });
+  }
+});
+
+app.post('/auth/login', async (req, res) => {
+  const { username, password } = req.body ?? {};
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    res.status(400).json({ error: 'Username and password are required.' });
+    return;
+  }
+  try {
+    const db = await dbPromise;
+    const user = await db.get(
+      'SELECT id, username, password_hash FROM users WHERE username = ?',
+      username.trim()
+    );
+    if (!user) {
+      res.status(401).json({ error: 'Invalid username or password.' });
+      return;
+    }
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) {
+      res.status(401).json({ error: 'Invalid username or password.' });
+      return;
+    }
+    const token = jwt.sign({ userId: user.id, username: user.username }, jwtSecret, {
+      expiresIn: '7d',
+    });
+    res.json({ token, user: { id: user.id, username: user.username } });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to log in.' });
+  }
+});
+
+app.get('/api/markers', requireAuth, async (req, res) => {
+  try {
+    const db = await dbPromise;
+    const markers = await db.all(
+      `SELECT id, latitude, longitude, name, address, emoji, created_at as createdAt
+       FROM markers
+       WHERE user_id = ?
+       ORDER BY id ASC`,
+      req.user.id
+    );
     res.json({ markers });
   } catch (error) {
     res.status(500).json({ error: 'Failed to load markers.' });
   }
 });
 
-app.post('/api/markers', async (req, res) => {
-  const { latitude, longitude, name } = req.body ?? {};
+app.post('/api/markers', requireAuth, async (req, res) => {
+  const { latitude, longitude, name, address, emoji } = req.body ?? {};
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     res.status(400).json({ error: 'Latitude and longitude must be numbers.' });
     return;
@@ -207,23 +346,21 @@ app.post('/api/markers', async (req, res) => {
   }
 
   try {
-    const markers = await loadMarkers();
-    const marker = createMarker(
+    const db = await dbPromise;
+    const marker = await insertMarker(db, req.user.id, {
       latitude,
       longitude,
-      typeof name === 'string' ? name : '',
-      '',
-      normalizeEmoji(req.body?.emoji)
-    );
-    markers.push(marker);
-    await saveMarkers(markers);
+      name: typeof name === 'string' ? name : '',
+      address: typeof address === 'string' ? address : '',
+      emoji: normalizeEmoji(emoji),
+    });
     res.status(201).json({ marker });
   } catch (error) {
     res.status(500).json({ error: 'Failed to save marker.' });
   }
 });
 
-app.post('/api/ingest', async (req, res) => {
+app.post('/api/ingest', requireAuth, async (req, res) => {
   const { url } = req.body ?? {};
   if (typeof url !== 'string' || url.trim().length === 0) {
     res.status(400).json({ error: 'Missing url.' });
@@ -297,16 +434,8 @@ app.post('/api/ingest', async (req, res) => {
       try {
         const geocoded = await geocodePlace(extracted);
         if (geocoded) {
-          const markers = await loadMarkers();
-          marker = createMarker(
-            geocoded.latitude,
-            geocoded.longitude,
-            geocoded.name,
-            geocoded.address,
-            geocoded.emoji
-          );
-          markers.push(marker);
-          await saveMarkers(markers);
+          const db = await dbPromise;
+          marker = await insertMarker(db, req.user.id, geocoded);
         }
       } catch (error) {
         marker = null;
