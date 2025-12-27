@@ -302,7 +302,8 @@ app.post('/api/ingest', async (req, res) => {
             geocoded.latitude,
             geocoded.longitude,
             geocoded.name,
-            geocoded.address
+            geocoded.address,
+            geocoded.emoji
           );
           markers.push(marker);
           await saveMarkers(markers);
