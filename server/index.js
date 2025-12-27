@@ -312,6 +312,16 @@ app.post('/api/ingest', async (req, res) => {
       }
     }
 
+    console.log(
+      'Ingest emoji debug:',
+      'extracted=',
+      extracted?.emoji,
+      'cuisine=',
+      extracted?.cuisine,
+      'marker=',
+      marker?.emoji
+    );
+
     res.status(202).json({
       ok: true,
       file: filename,
