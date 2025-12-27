@@ -107,15 +107,21 @@ export default function TabLayout() {
     <Tabs
       tabBar={(props) => <PillTabBar {...props} />}
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerStyle: { backgroundColor: '#25292e' },
+        headerTintColor: 'rgba(255,255,255,0.92)',
+        headerShadowVisible: false,
+
+        // keep pill behavior
         tabBarShowLabel: false,
       }}
     >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="about" />
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="about" options={{ title: 'Mentions' }} />
     </Tabs>
   );
 }
+
 
 const styles = StyleSheet.create({
   // This is now YOUR view, so px positioning works reliably.
