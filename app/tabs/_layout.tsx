@@ -12,10 +12,10 @@ function PillTabBar({ state, descriptors, navigation }: any) {
   const PILL_WIDTH_PX = 320;
   const PILL_HEIGHT_PX = 62;
 
-  // move left/right (smaller = more left)
+  // Horizontal position (smaller = more left)
   const TAB_LEFT_PX = 41;
 
-  // move up/down
+  // Vertical position
   const TAB_BOTTOM_PX = Math.max(insets.bottom + 12, 12);
 
   return (
@@ -60,6 +60,7 @@ function PillTabBar({ state, descriptors, navigation }: any) {
           navigation.emit({ type: 'tabLongPress', target: route.key });
         };
 
+        // Icon mapping: Tab 1 = Home, Tab 2 = Compass
         const iconName =
           route.name === 'index'
             ? isFocused
@@ -67,8 +68,8 @@ function PillTabBar({ state, descriptors, navigation }: any) {
               : 'home-outline'
             : route.name === 'about'
             ? isFocused
-              ? 'people'
-              : 'people-outline'
+              ? 'compass'
+              : 'compass-outline'
             : isFocused
             ? 'ellipse'
             : 'ellipse-outline';
@@ -83,6 +84,12 @@ function PillTabBar({ state, descriptors, navigation }: any) {
             onPress={onPress}
             onLongPress={onLongPress}
             style={styles.buttonWrap}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={
+              descriptors[route.key]?.options?.tabBarAccessibilityLabel
+            }
+            testID={descriptors[route.key]?.options?.tabBarTestID}
           >
             <View style={[styles.bubble, isFocused && styles.bubbleSelected]}>
               <Ionicons name={iconName as any} size={28} color={color} />
@@ -99,7 +106,7 @@ export default function TabLayout() {
     <Tabs
       tabBar={(props) => <PillTabBar {...props} />}
       screenOptions={{
-        headerShown: false, // <-- kills the grey "Home" bar at the tabs level
+        headerShown: false,
         tabBarShowLabel: false,
       }}
     >
@@ -118,6 +125,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
+
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 22,
@@ -139,7 +147,11 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
-  buttonWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  buttonWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   bubble: {
     width: 64,
     height: 44,
@@ -148,5 +160,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  bubbleSelected: { backgroundColor: 'rgba(255,255,255,0.14)' },
+  bubbleSelected: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
 });
