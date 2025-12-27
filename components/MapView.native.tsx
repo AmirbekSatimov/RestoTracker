@@ -12,6 +12,10 @@ export default function AppMapView({ latitude, longitude, markers = [] }: Props)
       style={{ flex: 1 }}
       mapType="mutedStandard"
       userInterfaceStyle="dark"
+
+      // moves the Maps attribution up so it doesn't sit at the very bottom
+      legalLabelInsets={{ top: 0, left: 12, right: 12, bottom: 80 }}
+
       initialRegion={{
         latitude,
         longitude,
