@@ -18,7 +18,7 @@ function BubbleTabButton(props: any) {
   return (
     <Pressable
       onPress={onPress}
-      // IMPORTANT: keep the navigator-provided style so each tab takes equal space
+      // Keep navigator-provided style so tab items size correctly
       style={[style, styles.buttonWrap]}
       {...rest}
     >
@@ -33,10 +33,10 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
-  // Pill size: tweak the multiplier (0.50–0.60) to taste
+  // Adjust this multiplier to make the pill shorter/longer
   const pillWidth = Math.round(screenWidth * 0.54);
 
-  // TRUE horizontal centering for an absolutely positioned view
+  // TRUE centering for absolute-positioned elements
   const left = Math.max(0, Math.round((screenWidth - pillWidth) / 2));
 
   return (
@@ -47,15 +47,13 @@ export default function TabLayout() {
 
         tabBarActiveTintColor: 'rgba(255,255,255,0.95)',
         tabBarInactiveTintColor: 'rgba(255,255,255,0.70)',
-
         tabBarActiveBackgroundColor: 'transparent',
 
-        // Bottom pill placement (centered)
         tabBarStyle: [
           styles.tabBar,
           {
             width: pillWidth,
-            left, // <- this is what actually centers it
+            left, // <-- THIS is the fix
             bottom: Math.max(insets.bottom + 10, 12),
           },
         ],
@@ -145,14 +143,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
 
-  // each tab takes equal space and centers its contents
   buttonWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // oval selection bubble (not square)
   bubble: {
     width: 64,
     height: 44,
