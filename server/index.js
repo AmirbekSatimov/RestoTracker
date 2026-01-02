@@ -407,8 +407,30 @@ app.post('/api/ingest', requireAuth, async (req, res) => {
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean);
-    const filename = outputLines[0];
-    const thumbnailUrl = outputLines[1] ?? null;
+    let filename = null;
+    let thumbnailUrl = null;
+
+    for (const line of outputLines) {
+      if (!filename) {
+        try {
+          await fs.access(line);
+          filename = line;
+          continue;
+        } catch {
+          // Not a local file path.
+        }
+      }
+    }
+
+    if (!filename) {
+      filename =
+        outputLines.find((line) => line.startsWith('/') || line.includes(':\\')) ?? null;
+    }
+
+    thumbnailUrl =
+      outputLines.find((line) => line.startsWith('http://') || line.startsWith('https://')) ??
+      null;
+
     if (!filename) {
       res.status(500).json({ error: 'Download failed.' });
       return;
