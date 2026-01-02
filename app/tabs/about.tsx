@@ -1,8 +1,11 @@
+import { useAuth } from '@/components/AuthContext';
+import { useMarkers } from '@/components/MarkersContext';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  ImageBackground,
   Modal,
   Platform,
   Pressable,
@@ -11,8 +14,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useAuth } from '@/components/AuthContext';
-import { useMarkers } from '@/components/MarkersContext';
 
 export default function AboutScreen() {
   const { token, user, authStatus, authError, login, register, logout } = useAuth();
@@ -308,38 +309,57 @@ export default function AboutScreen() {
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
-            onPress={() =>
-              router.push({
-                pathname: '/tabs',
-                params: {
-                  lat: item.latitude.toString(),
-                  lng: item.longitude.toString(),
-                },
-              })
-            }
-          >
-            <View style={styles.cardEmoji}>
-              <Text style={styles.cardEmojiText}>{item.emoji || '📍'}</Text>
-            </View>
-            <Text style={styles.cardTitle} numberOfLines={2}>
-              {item.name || 'Unknown place'}
-            </Text>
-            <Text style={styles.cardCity} numberOfLines={1}>
-              {getCity(item.address)}
-            </Text>
-            {item.sourceUrl ? (
-              <Text style={styles.cardLink} numberOfLines={1}>
-                {item.sourceUrl}
+        renderItem={({ item }) => {
+          const hasThumbnail = Boolean(item.thumbnailUrl);
+          const content = (
+            <>
+              <View style={styles.cardEmoji}>
+                <Text style={styles.cardEmojiText}>{item.emoji || '\u{1F4CD}'}</Text>
+              </View>
+              <Text style={hasThumbnail ? styles.cardTitleLight : styles.cardTitleDark} numberOfLines={2}>
+                {item.name || 'Unknown place'}
               </Text>
-            ) : null}
-          </Pressable>
-        )}
+              <Text style={hasThumbnail ? styles.cardCityLight : styles.cardCityDark} numberOfLines={1}>
+                {getCity(item.address)}
+              </Text>
+              {item.sourceUrl ? (
+                <Text style={hasThumbnail ? styles.cardLinkLight : styles.cardLinkDark} numberOfLines={1}>
+                  {item.sourceUrl}
+                </Text>
+              ) : null}
+            </>
+          );
+
+          return (
+            <Pressable
+              style={styles.card}
+              onPress={() =>
+                router.push({
+                  pathname: '/tabs',
+                  params: {
+                    lat: item.latitude.toString(),
+                    lng: item.longitude.toString(),
+                  },
+                })
+              }
+            >
+              {hasThumbnail ? (
+                <ImageBackground
+                  source={{ uri: item.thumbnailUrl }}
+                  style={styles.cardImage}
+                  imageStyle={styles.cardImageRadius}
+                >
+                  <View style={styles.cardOverlay}>{content}</View>
+                </ImageBackground>
+              ) : (
+                content
+              )}
+            </Pressable>
+          );
+        }}
       />
       <Pressable style={styles.settingsButton} onPress={() => setIsSettingsOpen(true)}>
-        <Text style={styles.settingsIcon}>⚙</Text>
+        <Text style={styles.settingsIcon}>{'\u2699'}</Text>
       </Pressable>
       <Pressable
         style={styles.fab}
@@ -494,7 +514,7 @@ export default function AboutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#25292e',
+    backgroundColor: '#fff',
     alignItems: 'stretch',
   },
   header: {
@@ -503,13 +523,13 @@ const styles = StyleSheet.create({
     paddingTop: 24,
   },
   title: {
-    color: '#fff',
+    color: '#111',
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 16,
   },
   status: {
-    color: '#b3b8bf',
+    color: '#333',
     marginBottom: 12,
   },
   listContent: {
@@ -522,16 +542,28 @@ const styles = StyleSheet.create({
   card: {
     width: '48%',
     height: 160,
-    backgroundColor: '#1f2328',
+    backgroundColor: '#f4f4f4',
     borderRadius: 14,
     padding: 12,
     marginBottom: 16,
+  },
+  cardImage: {
+    flex: 1,
+  },
+  cardImageRadius: {
+    borderRadius: 14,
+  },
+  cardOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 14,
+    padding: 12,
   },
   cardEmoji: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#25292e',
+    backgroundColor: '#e6e6e6',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
@@ -539,49 +571,63 @@ const styles = StyleSheet.create({
   cardEmojiText: {
     fontSize: 16,
   },
-  cardTitle: {
+  cardTitleDark: {
+    color: '#111',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  cardTitleLight: {
     color: '#fff',
     fontWeight: '600',
     marginBottom: 6,
   },
-  cardCity: {
-    color: '#b3b8bf',
+  cardCityDark: {
+    color: '#444',
     fontSize: 12,
   },
-  cardLink: {
-    color: '#9aa0a6',
+  cardCityLight: {
+    color: '#e0e0e0',
+    fontSize: 12,
+  },
+  cardLinkDark: {
+    color: '#555',
+    fontSize: 11,
+    marginTop: 8,
+  },
+  cardLinkLight: {
+    color: '#d0d0d0',
     fontSize: 11,
     marginTop: 8,
   },
   input: {
-    backgroundColor: '#1f2328',
-    borderColor: '#3a3f45',
+    backgroundColor: '#fff',
+    borderColor: '#d0d0d0',
     borderWidth: 1,
     borderRadius: 8,
-    color: '#fff',
+    color: '#111',
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   suggestingText: {
-    color: '#b3b8bf',
+    color: '#444',
     marginTop: 8,
   },
   suggestions: {
     marginTop: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#3a3f45',
-    backgroundColor: '#171a1f',
+    borderColor: '#d0d0d0',
+    backgroundColor: '#fff',
     overflow: 'hidden',
   },
   suggestionItem: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2f35',
+    borderBottomColor: '#e1e1e1',
   },
   suggestionTitle: {
-    color: '#fff',
+    color: '#111',
     fontWeight: '600',
   },
   button: {
@@ -608,7 +654,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   linkStatus: {
-    color: '#b3b8bf',
+    color: '#444',
     marginTop: 8,
   },
   authButtons: {
@@ -622,15 +668,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   authStatus: {
-    color: '#b3b8bf',
+    color: '#444',
     fontSize: 12,
   },
   authError: {
-    color: '#ff9b9b',
+    color: '#a00000',
     marginBottom: 8,
   },
   linkText: {
-    color: '#ffd33d',
+    color: '#7a5a00',
     fontSize: 12,
   },
   settingsButton: {
@@ -640,12 +686,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#1f2328',
+    backgroundColor: '#e6e6e6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   settingsIcon: {
-    color: '#fff',
+    color: '#111',
     fontSize: 18,
   },
   fab: {
@@ -680,25 +726,25 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#25292e',
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
   },
   modalTitle: {
-    color: '#fff',
+    color: '#111',
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
   },
   modalOption: {
-    backgroundColor: '#1f2328',
+    backgroundColor: '#f2f2f2',
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
     marginTop: 10,
   },
   modalOptionText: {
-    color: '#fff',
+    color: '#111',
     fontWeight: '600',
   },
   modalCancel: {
@@ -706,6 +752,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCancelText: {
-    color: '#b3b8bf',
+    color: '#444',
   },
 });

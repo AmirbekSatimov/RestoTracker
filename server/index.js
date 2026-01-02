@@ -69,10 +69,14 @@ async function initDb() {
       name TEXT,
       address TEXT,
       emoji TEXT,
+      thumbnail_url TEXT,
+      source_url TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
+  await ensureMarkerColumn(db, 'thumbnail_url', 'TEXT');
+  await ensureMarkerColumn(db, 'source_url', 'TEXT');
   return db;
 }
 
@@ -206,14 +210,16 @@ async function geocodePlace(extracted) {
 async function insertMarker(db, userId, marker) {
   const createdAt = new Date().toISOString();
   const result = await db.run(
-    `INSERT INTO markers (user_id, latitude, longitude, name, address, emoji, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO markers (user_id, latitude, longitude, name, address, emoji, thumbnail_url, source_url, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     userId,
     marker.latitude,
     marker.longitude,
     marker.name ?? '',
     marker.address ?? '',
     normalizeEmoji(marker.emoji),
+    marker.thumbnailUrl ?? null,
+    marker.sourceUrl ?? null,
     createdAt
   );
   return {
@@ -223,6 +229,8 @@ async function insertMarker(db, userId, marker) {
     name: marker.name ?? '',
     address: marker.address ?? '',
     emoji: normalizeEmoji(marker.emoji),
+    thumbnailUrl: marker.thumbnailUrl ?? null,
+    sourceUrl: marker.sourceUrl ?? null,
     createdAt,
   };
 }
@@ -322,7 +330,7 @@ app.get('/api/markers', requireAuth, async (req, res) => {
   try {
     const db = await dbPromise;
     const markers = await db.all(
-      `SELECT id, latitude, longitude, name, address, emoji, created_at as createdAt
+      `SELECT id, latitude, longitude, name, address, emoji, thumbnail_url as thumbnailUrl, source_url as sourceUrl, created_at as createdAt
        FROM markers
        WHERE user_id = ?
        ORDER BY id ASC`,
@@ -335,7 +343,7 @@ app.get('/api/markers', requireAuth, async (req, res) => {
 });
 
 app.post('/api/markers', requireAuth, async (req, res) => {
-  const { latitude, longitude, name, address, emoji } = req.body ?? {};
+  const { latitude, longitude, name, address, emoji, thumbnailUrl, sourceUrl } = req.body ?? {};
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     res.status(400).json({ error: 'Latitude and longitude must be numbers.' });
     return;
@@ -353,6 +361,8 @@ app.post('/api/markers', requireAuth, async (req, res) => {
       name: typeof name === 'string' ? name : '',
       address: typeof address === 'string' ? address : '',
       emoji: normalizeEmoji(emoji),
+      sourceUrl: typeof sourceUrl === 'string' ? sourceUrl : null,
+      thumbnailUrl: typeof thumbnailUrl === 'string' ? thumbnailUrl : null,
     });
     res.status(201).json({ marker });
   } catch (error) {
@@ -386,12 +396,19 @@ app.post('/api/ingest', requireAuth, async (req, res) => {
       ...(ytDlpCookies ? ['--cookies', ytDlpCookies] : []),
       '--print',
       'after_move:filepath',
+      '--print',
+      'thumbnail',
       '-o',
       outputTemplate,
       trimmedUrl,
     ];
     const { stdout } = await execFileAsync(ytDlpPath, args);
-    const filename = stdout.split('\n').map((line) => line.trim()).find(Boolean);
+    const outputLines = stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const filename = outputLines[0];
+    const thumbnailUrl = outputLines[1] ?? null;
     if (!filename) {
       res.status(500).json({ error: 'Download failed.' });
       return;
@@ -435,7 +452,11 @@ app.post('/api/ingest', requireAuth, async (req, res) => {
         const geocoded = await geocodePlace(extracted);
         if (geocoded) {
           const db = await dbPromise;
-          marker = await insertMarker(db, req.user.id, geocoded);
+          marker = await insertMarker(db, req.user.id, {
+            ...geocoded,
+            thumbnailUrl,
+            sourceUrl: trimmedUrl,
+          });
         }
       } catch (error) {
         marker = null;
@@ -539,3 +560,9 @@ app.get('/api/place-details', async (req, res) => {
 app.listen(port, '0.0.0.0', () => {
   console.log(`Places proxy listening on http://0.0.0.0:${port}`);
 });
+async function ensureMarkerColumn(db, columnName, columnType) {
+  const columns = await db.all('PRAGMA table_info(markers)');
+  if (!columns.some((column) => column.name === columnName)) {
+    await db.exec(`ALTER TABLE markers ADD COLUMN ${columnName} ${columnType}`);
+  }
+}

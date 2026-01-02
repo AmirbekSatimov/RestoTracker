@@ -10,6 +10,7 @@ type MapMarker = {
   emoji?: string;
   createdAt?: string;
   sourceUrl?: string;
+  thumbnailUrl?: string;
 };
 
 type MarkersContextValue = {
